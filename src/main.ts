@@ -1,5 +1,6 @@
 import './styles.css';
 import * as THREE from 'three';
+import { musicThemes } from './data/audio';
 import { dialogue } from './data/dialogue';
 import { cpuRacers, playerTemplate } from './data/racers';
 import { tracks } from './data/tracks';
@@ -295,8 +296,9 @@ function update(dt: number): void {
   recordFrameTime(dt);
   if (gameState === 'menu') {
     updateMenuCamera(dt, true);
-    audio.menuMusic(dt);
+    audio.playMusic(musicThemes.menu, dt);
   } else if (gameState === 'prerace') {
+    audio.playMusic(musicThemes.prerace, dt);
     lightTimer -= dt;
     if (lightTimer <= 0) startRace();
     updateMenuCamera(dt * 0.7, false);
@@ -313,10 +315,12 @@ function update(dt: number): void {
       if (latestSnapshot.complete) finishRace(latestSnapshot);
     }
   } else if (gameState === 'podium') {
+    audio.playMusic(musicThemes.podium, dt);
     updatePodiumCamera(dt, false);
   } else if (gameState === 'replay') {
     updateReplayPlayback(dt);
   } else if (gameState === 'finale') {
+    audio.playMusic(musicThemes.finale, dt);
     updatePodiumCamera(dt, true);
   }
 
@@ -353,6 +357,7 @@ function startPreRace(): void {
 function startRace(): void {
   gameState = 'race';
   resetFrameStats();
+  audio.stopMusic();
   hud.classList.add('active');
   controls.classList.add('active');
   control.brake = false;
@@ -490,6 +495,7 @@ function showCaption(name: string, text: string): void {
   caption.innerHTML = `<strong>${name}</strong> ${text}`;
   caption.classList.add('active');
   captionTimer = 5.5;
+  audio.speak(name, text);
 }
 
 function renderPodium(): void {
@@ -671,6 +677,7 @@ function exposeDebug(): void {
     replayDroppedSamples: lastReplay?.droppedSamples ?? 0,
     replaySampleRate: lastReplay?.sampleRate ?? 0,
     campaignLeader: campaignLeader(campaignScores)?.name ?? null,
+    audio: audio.metrics(),
   };
   debug.textContent = `calls ${metrics.calls}\ntris ${metrics.triangles}\ngeos ${metrics.geometries}\ntex ${metrics.textures}\nfps ${metrics.estimatedFps}\nreplay ${metrics.replayFrames}`;
   debug.classList.toggle('active', settings.performanceMode === 'highDetail');

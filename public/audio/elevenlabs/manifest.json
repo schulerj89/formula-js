@@ -1,0 +1,64 @@
+{
+  "generatedAt": "2026-06-26T04:54:33.839Z",
+  "dryRun": true,
+  "sources": {
+    "tts": "https://api.elevenlabs.io/v1/text-to-speech/:voice_id",
+    "music": "https://api.elevenlabs.io/v1/music"
+  },
+  "voiceLines": [
+    {
+      "id": "arthur-prerace",
+      "speaker": "Arthur Bell",
+      "voiceEnv": "ELEVENLABS_ARTHUR_VOICE_ID",
+      "text": "{track} looks magnificent today: fast entries, dangerous exits, and very honest kerbs.",
+      "file": "public/audio/elevenlabs/arthur-prerace.mp3",
+      "status": "planned"
+    },
+    {
+      "id": "mags-lights",
+      "speaker": "Mags Whitlow",
+      "voiceEnv": "ELEVENLABS_MAGS_VOICE_ID",
+      "text": "Five red lights, then it is noise, nerves, and no excuses.",
+      "file": "public/audio/elevenlabs/mags-lights.mp3",
+      "status": "planned"
+    },
+    {
+      "id": "radio-damage",
+      "speaker": "Radio",
+      "voiceEnv": "ELEVENLABS_ARTHUR_VOICE_ID",
+      "text": "Damage is climbing. Stay off the outside kerbs and bring it home.",
+      "file": "public/audio/elevenlabs/radio-damage.mp3",
+      "status": "planned"
+    }
+  ],
+  "songs": [
+    {
+      "id": "menu-gridline-spark",
+      "prompt": "Instrumental pop rock racing game menu loop, bright electric guitar hooks, tight drums, pulsing synth bass, celebratory but focused, no vocals.",
+      "music_length_ms": 18000,
+      "file": "public/audio/elevenlabs/menu-gridline-spark.mp3",
+      "status": "planned"
+    },
+    {
+      "id": "prerace-five-lights-rising",
+      "prompt": "Instrumental pre-race build, British motorsport tension, muted guitars, tom drums, rising synth pulses, dramatic but not dark, no vocals.",
+      "music_length_ms": 16000,
+      "file": "public/audio/elevenlabs/prerace-five-lights-rising.mp3",
+      "status": "planned"
+    },
+    {
+      "id": "podium-carbon-champagne",
+      "prompt": "Instrumental podium celebration, pop rock chorus feel, claps, clean guitars, triumphant synth lead, compact loop, no vocals.",
+      "music_length_ms": 18000,
+      "file": "public/audio/elevenlabs/podium-carbon-champagne.mp3",
+      "status": "planned"
+    },
+    {
+      "id": "finale-apex-parade",
+      "prompt": "Instrumental championship finale music, energetic pop rock parade, big drums, bright guitars, victory synths, celebratory, no vocals.",
+      "music_length_ms": 22000,
+      "file": "public/audio/elevenlabs/finale-apex-parade.mp3",
+      "status": "planned"
+    }
+  ]
+}

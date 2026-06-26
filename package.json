@@ -1,6 +1,6 @@
 {
   "name": "formula-js",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run tests/race.test.ts",
-    "screenshot": "playwright test tests/screenshot.spec.ts"
+    "screenshot": "playwright test tests/screenshot.spec.ts",
+    "audio:plan": "node scripts/generate-elevenlabs-assets.mjs",
+    "audio:generate": "node scripts/generate-elevenlabs-assets.mjs --generate"
   },
   "dependencies": {
     "three": "^0.166.1"

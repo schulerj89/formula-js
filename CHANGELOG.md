@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0 - 2026-06-26
+
+- Added four procedural WebAudio music themes for menu, pre-race, podium, and campaign finale states.
+- Added announcer/radio speech hooks with British-voice browser synthesis fallback and explicit active-race music silence.
+- Added ElevenLabs-safe asset planning/generation script plus a dry-run manifest for voice and music assets.
+- Added audio direction and ElevenLabs pipeline decision docs, with tests and browser smoke coverage for audio state.
+
 ## 0.2.0 - 2026-06-25
 
 - Added rotating title flyovers that preview multiple tracks before the player starts a race.

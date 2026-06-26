@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cpuRacers, playerTemplate } from '../src/data/racers';
 import { tracks } from '../src/data/tracks';
+import { musicThemes } from '../src/data/audio';
 import { createRace } from '../src/game/race';
 import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
 import { createReplayRecorder, findReplayFrame } from '../src/game/replay';
@@ -25,6 +26,19 @@ describe('track data', () => {
       expect(track.kerbZones.length).toBeGreaterThanOrEqual(3);
       expect(track.landmarks.length).toBeGreaterThanOrEqual(3);
       expect(new TrackPath(track).length).toBeGreaterThan(650);
+    }
+  });
+});
+
+describe('audio data', () => {
+  it('defines four non-race music themes with distinct titles and tempos', () => {
+    expect(Object.keys(musicThemes).sort()).toEqual(['finale', 'menu', 'podium', 'prerace']);
+    const titles = new Set(Object.values(musicThemes).map((theme) => theme.title));
+    expect(titles.size).toBe(4);
+    for (const theme of Object.values(musicThemes)) {
+      expect(theme.bpm).toBeGreaterThanOrEqual(100);
+      expect(theme.bpm).toBeLessThanOrEqual(140);
+      expect(theme.leadOffsets.length).toBeGreaterThanOrEqual(8);
     }
   });
 });

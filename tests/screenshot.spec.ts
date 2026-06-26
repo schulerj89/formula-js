@@ -23,4 +23,5 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.textures).toBeLessThan(20);
   expect(metrics.estimatedFps).toBeGreaterThan(0);
   expect(metrics.p95FrameMs).toBeGreaterThan(0);
+  expect(metrics.audio.musicCue).toBe('Silent');
 });
