@@ -438,6 +438,27 @@ p {
   border-color: rgb(255 107 107 / 42%);
 }
 
+.leaderboard-toggle {
+  display: none;
+  width: 44px;
+  min-height: 44px;
+  justify-self: end;
+  padding: 0;
+  color: #071018;
+  background: #f7c948;
+  border: 0;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.leaderboard-toggle.active {
+  color: #f7fbff;
+  background: rgb(69 212 131 / 88%);
+}
+
 .leaderboard {
   grid-column: 2;
   display: none;
@@ -459,6 +480,11 @@ p {
   margin: 0;
   padding-left: 20px;
   font-size: 0.72rem;
+}
+
+.leaderboard li.player {
+  color: #45d483;
+  font-weight: 900;
 }
 
 .standings {
@@ -735,8 +761,19 @@ p {
     font-size: 0.75rem;
   }
 
+  .leaderboard {
+    width: min(30vw, 128px);
+    min-width: 104px;
+    max-height: 150px;
+    padding: 8px;
+  }
+
   .leaderboard.active {
-    display: none;
+    display: block;
+  }
+
+  .leaderboard-toggle.available {
+    display: block;
   }
 
   .menu-utility {

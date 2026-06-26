@@ -49,6 +49,7 @@ Keep ElevenLabs credentials outside git. The generator reads `ELEVENLABS_API_KEY
 - Damage, tire wear, race radio, leaderboard toggle, standings, and performance overlay.
 - Lightweight car-contact damage with speed loss, separation, and radio feedback.
 - Live track map with player/rival dots plus nearest ahead/behind race gaps.
+- Mobile `POS` toggle for opening the race-order leaderboard without leaving it over the driving view by default.
 - Compact race guidance for closing traffic, side threats, and upcoming braking zones.
 - Active-race spotter radio for side-by-side threats and fast-closing traffic, with priority metrics.
 - Real driven-lap progression for time attack and campaign races.

@@ -109,6 +109,7 @@ let trackMapDomWrites = 0;
 let lastDamageScale = '';
 let lastTireScale = '';
 let lastLeaderboardHtml = '';
+let leaderboardExpanded = false;
 const frameTimes: number[] = [];
 let frameTimeWindow = 0;
 const roadParkingBase = 17;
@@ -225,6 +226,7 @@ root.innerHTML = `
           <span id="gapBehind">Back --</span>
           <span id="raceHint">Brake --</span>
         </div>
+        <button class="leaderboard-toggle" id="leaderboardButton" data-action="toggleLeaderboard" type="button" aria-pressed="false">POS</button>
       </div>
       <aside class="leaderboard" id="leaderboard"><ol></ol></aside>
     </div>
@@ -283,6 +285,7 @@ const speedValue = root.querySelector<HTMLElement>('#speed')!;
 const damageBar = root.querySelector<HTMLElement>('#damageBar')!;
 const tireBar = root.querySelector<HTMLElement>('#tireBar')!;
 const leaderboardList = leaderboard.querySelector<HTMLOListElement>('ol')!;
+const leaderboardButton = root.querySelector<HTMLButtonElement>('#leaderboardButton')!;
 const trackMapDotElements = new Map<string, SVGCircleElement>();
 
 initUi();
@@ -368,6 +371,8 @@ function initUi(): void {
       showSetup();
     } else if (action === 'settings') {
       showScreen('settings');
+    } else if (action === 'toggleLeaderboard') {
+      toggleLeaderboardPanel();
     } else if (action === 'tutorial') {
       gameState = 'tutorial';
       showScreen('tutorial');
@@ -529,6 +534,7 @@ function startPreRace(): void {
 function startRace(): void {
   invalidateDebugMetrics();
   gameState = 'race';
+  leaderboardExpanded = settings.leaderboard && !isMobileViewport();
   lightsOn = 0;
   startLights.classList.remove('active');
   resetFrameStats();
@@ -675,14 +681,26 @@ function updateHud(snapshot: RaceSnapshot): void {
   setScaleIfChanged(damageBar, 'damage', snapshot.player.damage);
   setScaleIfChanged(tireBar, 'tires', snapshot.player.tires);
   updateTrackMap(snapshot);
-  leaderboard.classList.toggle('active', settings.leaderboard);
-  const leaderboardHtml = snapshot.standings.map((racer) => `<li>${racer.definition.shortName} / L${visibleRacerLap(racer)}</li>`).join('');
+  const showLeaderboard = settings.leaderboard && (!isMobileViewport() || leaderboardExpanded);
+  leaderboard.classList.toggle('active', showLeaderboard);
+  leaderboardButton.classList.toggle('available', settings.leaderboard);
+  leaderboardButton.setAttribute('aria-label', showLeaderboard ? 'Hide leaderboard' : 'Show leaderboard');
+  leaderboardButton.setAttribute('aria-expanded', `${showLeaderboard}`);
+  const leaderboardHtml = snapshot.standings
+    .map((racer) => `<li class="${racer.definition.id === playerTemplate.id ? 'player' : ''}">${racer.definition.shortName} / L${visibleRacerLap(racer)}</li>`)
+    .join('');
   if (leaderboardHtml !== lastLeaderboardHtml) {
     leaderboardList.innerHTML = leaderboardHtml;
     lastLeaderboardHtml = leaderboardHtml;
     leaderboardRenderCount += 1;
     hudDomWrites += 1;
   }
+}
+
+function toggleLeaderboardPanel(): void {
+  if (!settings.leaderboard) return;
+  leaderboardExpanded = !leaderboardExpanded;
+  invalidateDebugMetrics();
 }
 
 function setTextIfChanged(element: HTMLElement, value: string): void {
@@ -1273,6 +1291,8 @@ function resize(): void {
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(targetPixelRatio());
   renderer.setSize(window.innerWidth, window.innerHeight);
+  leaderboardExpanded = settings.leaderboard && !isMobileViewport();
+  invalidateDebugMetrics();
 }
 
 function sceneDetailLevel(): SceneDetailLevel {
@@ -1282,10 +1302,14 @@ function sceneDetailLevel(): SceneDetailLevel {
 }
 
 function targetPixelRatio(): number {
-  const mobile = window.innerWidth <= 640;
+  const mobile = isMobileViewport();
   if (settings.performanceMode === 'highDetail') return Math.min(window.devicePixelRatio, mobile ? 1.2 : 2);
   if (settings.performanceMode === 'battery') return Math.min(window.devicePixelRatio, mobile ? 0.85 : 1.1);
   return Math.min(window.devicePixelRatio, mobile ? 1 : 1.3);
+}
+
+function isMobileViewport(): boolean {
+  return window.innerWidth <= 640;
 }
 
 function exposeDebug(dt = 0): void {
@@ -1384,6 +1408,14 @@ function buildDebugMetrics() {
       sideBySide: readoutSideBySide,
       nextBrakeMeters,
       brakeUrgency,
+    },
+    leaderboard: {
+      enabled: settings.leaderboard,
+      open: leaderboard.classList.contains('active'),
+      mobileCollapsed: isMobileViewport() && settings.leaderboard && !leaderboard.classList.contains('active'),
+      rowCount: leaderboardList.children.length,
+      playerPosition: latestSnapshot?.position ?? null,
+      renders: leaderboardRenderCount,
     },
     playerHandling: latestSnapshot?.player.handling ?? null,
     cpuRacecraft,

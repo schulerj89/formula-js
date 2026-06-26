@@ -50,6 +50,8 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await expect(page.locator('#raceHint')).toBeVisible();
   if (isMobile) {
     await expect(page.locator('#leaderboard')).toBeHidden();
+    await page.getByRole('button', { name: 'Show leaderboard' }).click();
+    await expect(page.locator('#leaderboard')).toBeVisible();
   } else {
     await expect(page.locator('#leaderboard')).toBeVisible();
   }
@@ -97,6 +99,11 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(['clear', 'soon', 'now']).toContain(metrics.raceReadability.brakeUrgency);
   expect(typeof metrics.raceReadability.closingAhead).toBe('boolean');
   expect(typeof metrics.raceReadability.closingBehind).toBe('boolean');
+  expect(metrics.leaderboard.enabled).toBe(true);
+  expect(metrics.leaderboard.rowCount).toBe(8);
+  expect(metrics.leaderboard.playerPosition).toBeGreaterThanOrEqual(1);
+  expect(metrics.leaderboard.playerPosition).toBeLessThanOrEqual(8);
+  if (isMobile) expect(metrics.leaderboard.open).toBe(true);
   expect(metrics.playerHandling.grip).toBeGreaterThan(0);
   expect(metrics.playerHandling.steeringResponse).toBeGreaterThan(0);
   expect(metrics.playerHandling.cornerLoad).toBeGreaterThanOrEqual(0);

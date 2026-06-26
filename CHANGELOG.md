@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.16.0 - 2026-06-26
+
+- Added a mobile in-race `POS` button that opens the leaderboard on demand without default HUD clutter.
+- Kept desktop leaderboard behavior unchanged when the leaderboard setting is enabled.
+- Highlighted the player row in the leaderboard and exposed leaderboard open/row/player-position metrics.
+- Updated browser smoke coverage for mobile collapsed/open leaderboard behavior.
+
 ## 1.15.0 - 2026-06-26
 
 - Added corner-aware player handling that uses track kerb/corner pressure, tire health, damage, and steering load.
