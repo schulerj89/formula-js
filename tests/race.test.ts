@@ -7,6 +7,7 @@ import { bodyPaintOptions, helmetPaintOptions } from '../src/data/customization'
 import { elevenLabsSongAssets, elevenLabsVoiceAssets, matchVoiceAsset } from '../src/data/elevenlabs';
 import { analyzeRaceAudio, RaceAudio } from '../src/game/audio';
 import { analyzeCarContact, analyzeCpuRacecraft, createRace, type RacerState } from '../src/game/race';
+import { createPositionCommentary } from '../src/game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability } from '../src/game/raceReadability';
 import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
@@ -309,6 +310,47 @@ describe('race simulation', () => {
     expect(summary.sideBySide?.side).toBe('right');
     expect(summary.nextBrakeMeters).toBeLessThan(60);
     expect(summary.brakeUrgency).toBe('now');
+  });
+
+  it('creates stable dynamic commentary for position gains', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const snapshot = createRace('timeAttack', tracks[0], racers, settings).snapshot();
+    snapshot.player.distance = 0.22;
+    snapshot.racers[1].distance = 0.2;
+    const standings = [...snapshot.racers].sort((a, b) => b.distance - a.distance);
+    const crafted = { ...snapshot, standings, position: standings.findIndex((racer) => racer.definition.id === 'player') + 1 };
+
+    const event = createPositionCommentary(2, crafted, settings.playerName);
+
+    expect(event?.kind).toBe('position-gained');
+    expect(event?.lineId).toBe('mags.position-gained.clean-pass');
+    expect(event?.priority).toBe(2);
+    expect(event?.speaker).toBe('Mags Whitlow');
+    expect(event?.focusRacerId).toBe('cpu-1');
+  });
+
+  it('creates stable dynamic commentary for position losses', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const snapshot = createRace('timeAttack', tracks[0], racers, settings).snapshot();
+    snapshot.player.distance = 0.2;
+    snapshot.racers[1].distance = 0.22;
+    const standings = [...snapshot.racers].sort((a, b) => b.distance - a.distance);
+    const crafted = { ...snapshot, standings, position: standings.findIndex((racer) => racer.definition.id === 'player') + 1 };
+
+    const event = createPositionCommentary(1, crafted, settings.playerName);
+
+    expect(event?.kind).toBe('position-lost');
+    expect(event?.lineId).toBe('arthur.position-lost.reset');
+    expect(event?.priority).toBe(2);
+    expect(event?.speaker).toBe('Arthur Bell');
+    expect(event?.focusRacerId).toBe('cpu-1');
+  });
+
+  it('does not create dynamic position commentary when the position is unchanged', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const snapshot = createRace('timeAttack', tracks[0], racers, settings).snapshot();
+
+    expect(createPositionCommentary(snapshot.position, snapshot, settings.playerName)).toBeNull();
   });
 
   it('gives CPU racers corner braking and overtake intent', () => {

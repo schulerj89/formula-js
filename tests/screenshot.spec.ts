@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+test.setTimeout(75_000);
+
 test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await page.goto('/');
   await page.waitForFunction(() => Boolean((window as any).__GRIDLINE_APEX__?.ready));
@@ -31,6 +33,8 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await page.waitForTimeout(8000);
   await page.keyboard.up('Space');
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'race');
+  await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.debug?.forcePositionGain?.());
+  await page.waitForFunction(() => ((window as any).__GRIDLINE_APEX__?.metrics?.raceCommentary?.callouts ?? 0) > 0);
   await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.debug?.forceContact?.());
   await page.waitForFunction(() => ((window as any).__GRIDLINE_APEX__?.metrics?.contact?.playerEvents ?? 0) > 0);
   await expect(page.locator('#lap')).toHaveText('1/1');
@@ -82,6 +86,11 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.contact.maxSeverity).toBeGreaterThanOrEqual(metrics.contact.playerMaxSeverity);
   expect(metrics.contact.playerLastRacerId).toBeTruthy();
   expect(metrics.contact.totalEvents).toBeGreaterThanOrEqual(metrics.contact.playerEvents);
+  expect(metrics.raceCommentary.callouts).toBeGreaterThan(0);
+  expect(metrics.raceCommentary.lastKind).toBe('position-gained');
+  expect(metrics.raceCommentary.lastLineId).toBe('mags.position-gained.clean-pass');
+  expect(metrics.raceCommentary.lastPriority).toBe(2);
+  expect(metrics.raceCommentary.lastFocusRacerId).toBeTruthy();
   expect(metrics.sceneDetails.barrierPanels).toBe(320);
   expect(metrics.sceneDetails.sponsorBoards).toBe(72);
   expect(metrics.sceneDetails.tireStacks).toBeGreaterThan(40);

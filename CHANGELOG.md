@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0 - 2026-06-26
+
+- Added dynamic race commentary for player position gains and losses during active racing.
+- Added priority and cooldown gating so position calls do not stomp start captions or radio warnings.
+- Exposed race-commentary debug metrics and a deterministic smoke hook for browser tests.
+- Added unit coverage for stable commentary event kinds, line IDs, priority, and focus racer targeting.
+
 ## 1.5.0 - 2026-06-26
 
 - Added lightweight car-contact detection using visual track progress and lateral overlap.

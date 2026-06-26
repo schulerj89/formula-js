@@ -11,6 +11,7 @@ import { applyCampaignResults, campaignLeader, createCampaignScores, type Campai
 import { createFormulaAssetManager } from './game/formulaAssets';
 import { animateDriverIdle } from './game/models';
 import { createRace, createResults, type RaceControl, type RaceSnapshot } from './game/race';
+import { createPositionCommentary, type RaceCommentaryKind } from './game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability, type TrackMapLayout } from './game/raceReadability';
 import { createReplayRecorder, findReplayFrame, type RaceReplay, type ReplayRecorder } from './game/replay';
 import { buildRaceScene, createPodiumCeremony, type PodiumCeremonyStats, type SceneBuild } from './game/scene';
@@ -46,6 +47,16 @@ let lightTimer = 0;
 let lightsOn = 0;
 let lastRadio = '';
 let lastContactRadioEvent = 0;
+let raceCommentaryElapsed = 0;
+let lastCommentaryPosition: number | null = null;
+let lastRaceCommentaryAt = -999;
+let raceCommentaryCallouts = 0;
+let raceCommentarySuppressedByCooldown = 0;
+let lastRaceCommentaryKind: RaceCommentaryKind | null = null;
+let lastRaceCommentaryLineId: string | null = null;
+let lastRaceCommentaryPriority: number | null = null;
+let lastRaceCommentarySpeaker: string | null = null;
+let lastRaceCommentaryFocusRacerId: string | null = null;
 let campaignTrackIndex = 0;
 let uiBound = false;
 let replayRecorder: ReplayRecorder | null = null;
@@ -403,11 +414,13 @@ function update(dt: number): void {
     updateMenuCamera(dt * 0.7, false);
   } else if (gameState === 'race') {
     const activeControl = currentControl();
+    raceCommentaryElapsed += dt;
     latestSnapshot = race?.update(dt, activeControl) ?? null;
     if (latestSnapshot) {
       updateCars(latestSnapshot);
       updateRaceCamera(latestSnapshot);
       updateHud(latestSnapshot);
+      updateRaceCommentary(latestSnapshot);
       updateRadio(latestSnapshot);
       replayRecorder?.record(dt, latestSnapshot);
       audio.updateRaceFeedback(latestSnapshot, activeControl, dt);
@@ -443,6 +456,16 @@ function startPreRace(): void {
   lightsOn = 0;
   lastContactRadioEvent = 0;
   lastRadio = '';
+  raceCommentaryElapsed = 0;
+  lastCommentaryPosition = null;
+  lastRaceCommentaryAt = -999;
+  raceCommentaryCallouts = 0;
+  raceCommentarySuppressedByCooldown = 0;
+  lastRaceCommentaryKind = null;
+  lastRaceCommentaryLineId = null;
+  lastRaceCommentaryPriority = null;
+  lastRaceCommentarySpeaker = null;
+  lastRaceCommentaryFocusRacerId = null;
   updateStartLights();
   startLights.classList.add('active');
   showScreen(null);
@@ -454,6 +477,7 @@ function startPreRace(): void {
   race = createRace(mode, selectedTrack, racers, settings);
   replayRecorder = createReplayRecorder(selectedTrack.id, selectedTrack.name, settings.playerName);
   latestSnapshot = race.snapshot();
+  lastCommentaryPosition = latestSnapshot.position;
   replayRecorder.record(0, latestSnapshot);
   lightTimer = 3.4;
   audio.beep(5);
@@ -702,6 +726,25 @@ function updateRadio(snapshot: RaceSnapshot): void {
   }
 }
 
+function updateRaceCommentary(snapshot: RaceSnapshot, force = false): void {
+  const previousPosition = lastCommentaryPosition;
+  lastCommentaryPosition = snapshot.position;
+  const event = createPositionCommentary(previousPosition, snapshot, settings.playerName);
+  if (!event) return;
+  if (!force && (raceCommentaryElapsed < 3.5 || raceCommentaryElapsed - lastRaceCommentaryAt < 4.4)) {
+    raceCommentarySuppressedByCooldown += 1;
+    return;
+  }
+  raceCommentaryCallouts += 1;
+  lastRaceCommentaryAt = raceCommentaryElapsed;
+  lastRaceCommentaryKind = event.kind;
+  lastRaceCommentaryLineId = event.lineId;
+  lastRaceCommentaryPriority = event.priority;
+  lastRaceCommentarySpeaker = event.speaker;
+  lastRaceCommentaryFocusRacerId = event.focusRacerId;
+  showCaption(event.speaker, event.text);
+}
+
 function rotateCaption(): void {
   const bank = gameState === 'race' ? dialogue.race : dialogue.title;
   const line = bank[captionIndex % bank.length];
@@ -808,6 +851,24 @@ function forceContactForSmoke(): void {
   rival.lateral = 0.55;
   rival.speed = Math.max(34, player.speed - 14);
   rival.contactCooldown = 0;
+}
+
+function forcePositionGainForSmoke(): void {
+  if (!latestSnapshot || gameState !== 'race') return;
+  const playerIndex = latestSnapshot.standings.findIndex((racer) => racer.definition.id === playerTemplate.id);
+  const passedRival = playerIndex > 0 ? latestSnapshot.standings[playerIndex - 1] : latestSnapshot.standings[playerIndex + 1];
+  if (!passedRival) return;
+  lastCommentaryPosition = Math.min(latestSnapshot.standings.length, latestSnapshot.position + 1);
+  const player = latestSnapshot.player;
+  player.distance = Math.max(player.distance, passedRival.distance + 0.004);
+  player.progress = (0.985 + player.distance) % 1;
+  player.speed = Math.max(player.speed, passedRival.speed + 2);
+  const standings = [...latestSnapshot.racers].sort((a, b) => b.distance - a.distance);
+  updateRaceCommentary({
+    ...latestSnapshot,
+    standings,
+    position: standings.findIndex((racer) => racer.definition.id === playerTemplate.id) + 1,
+  }, true);
 }
 
 function stagePodiumCeremony(racerIds: string[], finaleMode: boolean): void {
@@ -1046,6 +1107,16 @@ function exposeDebug(): void {
       totalEvents: latestSnapshot ? latestSnapshot.racers.reduce((total, racer) => total + racer.contactEvents, 0) : 0,
       maxSeverity: latestSnapshot ? Math.max(0, ...latestSnapshot.racers.map((racer) => racer.maxContactSeverity)) : 0,
     },
+    raceCommentary: {
+      callouts: raceCommentaryCallouts,
+      suppressedByCooldown: raceCommentarySuppressedByCooldown,
+      lastKind: lastRaceCommentaryKind,
+      lastLineId: lastRaceCommentaryLineId,
+      lastPriority: lastRaceCommentaryPriority,
+      lastSpeaker: lastRaceCommentarySpeaker,
+      lastFocusRacerId: lastRaceCommentaryFocusRacerId,
+      cooldownRemaining: Math.max(0, Math.round((4.4 - (raceCommentaryElapsed - lastRaceCommentaryAt)) * 10) / 10),
+    },
     campaignLeader: campaignLeader(campaignScores)?.name ?? null,
     sceneDetails: sceneBuild?.detailStats ?? null,
     podium: {
@@ -1073,6 +1144,7 @@ function exposeDebug(): void {
     debug: {
       forcePodium: forcePodiumForSmoke,
       forceContact: forceContactForSmoke,
+      forcePositionGain: forcePositionGainForSmoke,
     },
   };
 }
