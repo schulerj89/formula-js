@@ -1,10 +1,23 @@
 import type { GameSettings } from '../types';
 import { announcerVoiceProfiles, type MusicCueId, type MusicTheme } from '../data/audio';
+import type { RaceControl, RaceSnapshot } from './race';
+
+export interface RaceAudioFeedback {
+  gear: number;
+  revs: number;
+  engineFrequency: number;
+  engineGain: number;
+  tireLoad: number;
+  kerbLoad: number;
+  offTrackLoad: number;
+}
 
 export class RaceAudio {
   private context: AudioContext | null = null;
   private engine: OscillatorNode | null = null;
   private engineGain: GainNode | null = null;
+  private engineHarmonic: OscillatorNode | null = null;
+  private engineHarmonicGain: GainNode | null = null;
   private musicTimer = 0;
   private musicStep = 0;
   private currentMusic: MusicCueId | null = null;
@@ -13,6 +26,16 @@ export class RaceAudio {
   private speechEnabled = typeof window !== 'undefined' && 'speechSynthesis' in window;
   private musicEvents = 0;
   private speechEvents = 0;
+  private tireScrubEvents = 0;
+  private impactEvents = 0;
+  private kerbEvents = 0;
+  private gearShiftEvents = 0;
+  private radioDucks = 0;
+  private tireCooldown = 0;
+  private impactCooldown = 0;
+  private lastGear = 1;
+  private lastDamage = 1;
+  private raceFeedback: RaceAudioFeedback = defaultFeedback();
 
   constructor(private readonly settings: GameSettings) {}
 
@@ -23,6 +46,44 @@ export class RaceAudio {
   }
 
   setEngine(speed: number): void {
+    this.setEngineTone(analyzeRaceAudio({ speed, lateral: 0, damage: this.lastDamage } as RaceSnapshot['player'], { throttle: true, brake: false, steer: 0 }));
+  }
+
+  updateRaceFeedback(snapshot: RaceSnapshot, control: RaceControl, dt: number): void {
+    this.tireCooldown = Math.max(0, this.tireCooldown - dt);
+    this.impactCooldown = Math.max(0, this.impactCooldown - dt);
+    const feedback = analyzeRaceAudio(snapshot.player, control);
+    this.raceFeedback = feedback;
+
+    if (feedback.gear !== this.lastGear && snapshot.player.speed > 10) {
+      this.gearShiftEvents += 1;
+      this.playTone(180 + feedback.gear * 36, 0.035, 'square', 0.018);
+    }
+    this.lastGear = feedback.gear;
+
+    if (feedback.tireLoad > 0.58 && this.tireCooldown <= 0) {
+      this.tireScrubEvents += 1;
+      this.tireCooldown = 0.26;
+      this.playNoise(0.07, Math.min(0.05, feedback.tireLoad * 0.04), 1100);
+    }
+
+    if (feedback.kerbLoad > 0.28 && this.impactCooldown <= 0) {
+      this.kerbEvents += 1;
+      this.impactCooldown = 0.34;
+      this.playTone(92, 0.07, 'triangle', 0.055);
+    }
+
+    const damageDrop = Math.max(0, this.lastDamage - snapshot.player.damage);
+    if (damageDrop > 0.003 && this.impactCooldown <= 0) {
+      this.impactEvents += 1;
+      this.impactCooldown = 0.42;
+      this.playTone(58, 0.11, 'sawtooth', 0.06);
+    }
+    this.lastDamage = snapshot.player.damage;
+    this.setEngineTone(feedback);
+  }
+
+  private setEngineTone(feedback: RaceAudioFeedback): void {
     if (this.settings.mute || !this.context) return;
     if (!this.engine) {
       this.engine = this.context.createOscillator();
@@ -32,13 +93,23 @@ export class RaceAudio {
       this.engine.connect(this.engineGain);
       this.engineGain.connect(this.context.destination);
       this.engine.start();
+      this.engineHarmonic = this.context.createOscillator();
+      this.engineHarmonic.type = 'square';
+      this.engineHarmonicGain = this.context.createGain();
+      this.engineHarmonicGain.gain.value = 0;
+      this.engineHarmonic.connect(this.engineHarmonicGain);
+      this.engineHarmonicGain.connect(this.context.destination);
+      this.engineHarmonic.start();
     }
-    this.engine.frequency.setTargetAtTime(70 + speed * 6, this.context.currentTime, 0.04);
-    this.engineGain?.gain.setTargetAtTime(Math.min(0.08, 0.015 + speed / 1200), this.context.currentTime, 0.05);
+    this.engine.frequency.setTargetAtTime(feedback.engineFrequency, this.context.currentTime, 0.035);
+    this.engineGain?.gain.setTargetAtTime(feedback.engineGain, this.context.currentTime, 0.05);
+    this.engineHarmonic?.frequency.setTargetAtTime(feedback.engineFrequency * 1.72, this.context.currentTime, 0.04);
+    this.engineHarmonicGain?.gain.setTargetAtTime(feedback.engineGain * 0.28 * feedback.revs, this.context.currentTime, 0.045);
   }
 
   stopEngine(): void {
     this.engineGain?.gain.setTargetAtTime(0, this.context?.currentTime ?? 0, 0.08);
+    this.engineHarmonicGain?.gain.setTargetAtTime(0, this.context?.currentTime ?? 0, 0.08);
   }
 
   stopMusic(): void {
@@ -91,6 +162,11 @@ export class RaceAudio {
     this.lastSpeaker = speaker;
     if (this.settings.mute) return;
     this.radioClick(speaker === 'Radio');
+    if (speaker === 'Radio') {
+      this.radioDucks += 1;
+      this.engineGain?.gain.setTargetAtTime(Math.max(0.012, this.raceFeedback.engineGain * 0.45), this.context?.currentTime ?? 0, 0.025);
+      this.engineHarmonicGain?.gain.setTargetAtTime(0.004, this.context?.currentTime ?? 0, 0.025);
+    }
     if (!this.speechEnabled || !('SpeechSynthesisUtterance' in window)) return;
     const utterance = new SpeechSynthesisUtterance(text);
     const profile = announcerVoiceProfiles[speaker as keyof typeof announcerVoiceProfiles] ?? announcerVoiceProfiles['Arthur Bell'];
@@ -105,13 +181,34 @@ export class RaceAudio {
     this.speechEvents += 1;
   }
 
-  metrics(): { musicCue: string; musicEvents: number; speechEnabled: boolean; speechEvents: number; lastSpeaker: string } {
+  metrics(): {
+    musicCue: string;
+    musicEvents: number;
+    speechEnabled: boolean;
+    speechEvents: number;
+    lastSpeaker: string;
+    race: RaceAudioFeedback & {
+      tireScrubEvents: number;
+      impactEvents: number;
+      kerbEvents: number;
+      gearShiftEvents: number;
+      radioDucks: number;
+    };
+  } {
     return {
       musicCue: this.activeMusicTitle,
       musicEvents: this.musicEvents,
       speechEnabled: this.speechEnabled,
       speechEvents: this.speechEvents,
       lastSpeaker: this.lastSpeaker,
+      race: {
+        ...this.raceFeedback,
+        tireScrubEvents: this.tireScrubEvents,
+        impactEvents: this.impactEvents,
+        kerbEvents: this.kerbEvents,
+        gearShiftEvents: this.gearShiftEvents,
+        radioDucks: this.radioDucks,
+      },
     };
   }
 
@@ -122,7 +219,7 @@ export class RaceAudio {
   }
 
   private playTone(frequency: number, duration: number, type: OscillatorType, volume: number): void {
-    if (!this.context) return;
+    if (!this.context || this.settings.mute) return;
     const osc = this.context.createOscillator();
     const gain = this.context.createGain();
     osc.type = type;
@@ -143,6 +240,66 @@ export class RaceAudio {
     const volume = kind === 'kick' ? 0.05 : kind === 'snare' ? 0.035 : 0.018;
     this.playTone(frequency, duration, kind === 'hat' ? 'square' : 'triangle', volume);
   }
+
+  private playNoise(duration: number, volume: number, filterFrequency: number): void {
+    if (!this.context || this.settings.mute) return;
+    const sampleRate = this.context.sampleRate;
+    const buffer = this.context.createBuffer(1, Math.max(1, Math.floor(sampleRate * duration)), sampleRate);
+    const channel = buffer.getChannelData(0);
+    for (let i = 0; i < channel.length; i += 1) {
+      channel[i] = (Math.random() * 2 - 1) * (1 - i / channel.length);
+    }
+    const source = this.context.createBufferSource();
+    const filter = this.context.createBiquadFilter();
+    const gain = this.context.createGain();
+    filter.type = 'highpass';
+    filter.frequency.value = filterFrequency;
+    gain.gain.setValueAtTime(volume, this.context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + duration);
+    source.buffer = buffer;
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.context.destination);
+    source.start();
+    source.stop(this.context.currentTime + duration);
+  }
 }
 
 const ratio = (semitones: number): number => 2 ** (semitones / 12);
+
+export function analyzeRaceAudio(
+  player: Pick<RaceSnapshot['player'], 'speed' | 'lateral' | 'damage'>,
+  control: RaceControl,
+): RaceAudioFeedback {
+  const speed = Math.max(0, player.speed);
+  const gear = Math.min(7, Math.max(1, Math.floor(speed / 12) + 1));
+  const gearSpan = 12;
+  const gearProgress = (speed % gearSpan) / gearSpan;
+  const revs = clamp(0.28 + gearProgress * 0.62 + (control.throttle ? 0.12 : 0) - (control.brake ? 0.08 : 0), 0.22, 1);
+  const offTrackLoad = clamp((Math.abs(player.lateral) - 4.8) / 2.4, 0, 1);
+  const kerbLoad = clamp((Math.abs(player.lateral) - 3.55) / 1.4, 0, 1) * clamp(speed / 42, 0, 1);
+  const tireLoad = clamp(Math.abs(control.steer) * 0.76 + (control.brake ? 0.28 : 0) + offTrackLoad * 0.45 + speed / 260, 0, 1);
+  return {
+    gear,
+    revs,
+    engineFrequency: 92 + gear * 74 + revs * 420 + speed * 1.4,
+    engineGain: clamp(0.018 + speed / 1050 + (control.throttle ? 0.012 : 0), 0.012, 0.095),
+    tireLoad,
+    kerbLoad,
+    offTrackLoad,
+  };
+}
+
+function defaultFeedback(): RaceAudioFeedback {
+  return {
+    gear: 1,
+    revs: 0,
+    engineFrequency: 0,
+    engineGain: 0,
+    tireLoad: 0,
+    kerbLoad: 0,
+    offTrackLoad: 0,
+  };
+}
+
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));

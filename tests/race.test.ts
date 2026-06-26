@@ -4,6 +4,7 @@ import { tracks } from '../src/data/tracks';
 import { musicThemes } from '../src/data/audio';
 import { formulaAssetManifest } from '../src/data/assets';
 import { bodyPaintOptions, helmetPaintOptions } from '../src/data/customization';
+import { analyzeRaceAudio } from '../src/game/audio';
 import { createRace } from '../src/game/race';
 import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
 import { createReplayRecorder, findReplayFrame } from '../src/game/replay';
@@ -44,6 +45,17 @@ describe('audio data', () => {
       expect(theme.bpm).toBeLessThanOrEqual(140);
       expect(theme.leadOffsets.length).toBeGreaterThanOrEqual(8);
     }
+  });
+
+  it('maps race state into gear, rev, tire, and kerb audio feedback', () => {
+    const calm = analyzeRaceAudio({ speed: 18, lateral: 0.5, damage: 1 }, { throttle: true, brake: false, steer: 0.1 });
+    const loaded = analyzeRaceAudio({ speed: 58, lateral: 5.6, damage: 0.8 }, { throttle: true, brake: true, steer: 0.9 });
+    expect(calm.gear).toBeGreaterThanOrEqual(1);
+    expect(loaded.gear).toBeGreaterThan(calm.gear);
+    expect(loaded.engineFrequency).toBeGreaterThan(calm.engineFrequency);
+    expect(loaded.tireLoad).toBeGreaterThan(calm.tireLoad);
+    expect(loaded.kerbLoad).toBeGreaterThan(calm.kerbLoad);
+    expect(loaded.offTrackLoad).toBeGreaterThan(0);
   });
 });
 

@@ -38,6 +38,12 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.estimatedFps).toBeGreaterThan(0);
   expect(metrics.p95FrameMs).toBeGreaterThan(0);
   expect(metrics.audio.musicCue).toBe('Silent');
+  expect(metrics.audio.race.gear).toBeGreaterThanOrEqual(1);
+  expect(metrics.audio.race.engineFrequency).toBeGreaterThan(0);
+  expect(metrics.audio.race.engineGain).toBeGreaterThan(0);
+  expect(metrics.audio.race.tireScrubEvents).toBeLessThan(40);
+  expect(metrics.audio.race.kerbEvents).toBeLessThan(30);
+  expect(metrics.audio.race.radioDucks).toBeGreaterThanOrEqual(0);
   expect(metrics.sceneDetails.barrierPanels).toBe(320);
   expect(metrics.sceneDetails.sponsorBoards).toBe(72);
   expect(metrics.sceneDetails.tireStacks).toBeGreaterThan(40);

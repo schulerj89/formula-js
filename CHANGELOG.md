@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0 - 2026-06-26
+
+- Added active-race audio feedback with gear/rev engine telemetry, harmonic engine shaping, tire scrub cues, and kerb/off-track thumps.
+- Added radio ducking counters and engine-gain reduction for radio calls so critical warnings cut through the race mix.
+- Exposed race-audio metrics for smoke tests while preserving the no-music-during-race rule.
+- Added pure unit coverage for race-state-to-audio telemetry mapping.
+
 ## 0.7.0 - 2026-06-26
 
 - Added instanced trackside atmosphere: Armco barriers, sponsor boards, tire stacks, pit wall segments, start grid marks, and a physical start gantry.

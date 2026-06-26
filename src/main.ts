@@ -371,7 +371,7 @@ function update(dt: number): void {
       updateHud(latestSnapshot);
       updateRadio(latestSnapshot);
       replayRecorder?.record(dt, latestSnapshot);
-      audio.setEngine(latestSnapshot.player.speed);
+      audio.updateRaceFeedback(latestSnapshot, activeControl, dt);
       if (latestSnapshot.complete) finishRace(latestSnapshot);
     }
   } else if (gameState === 'podium') {
