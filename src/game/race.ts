@@ -15,6 +15,11 @@ export interface RacerState {
   finished: boolean;
   finishTime: number;
   racecraft: CpuRacecraft;
+  contactCooldown: number;
+  contactEvents: number;
+  lastContactSeverity: number;
+  maxContactSeverity: number;
+  lastContactRacerId: string | null;
 }
 
 export interface CpuRacecraft {
@@ -62,6 +67,11 @@ export function createRace(
     finished: false,
     finishTime: Number.POSITIVE_INFINITY,
     racecraft: defaultRacecraft(),
+    contactCooldown: 0,
+    contactEvents: 0,
+    lastContactSeverity: 0,
+    maxContactSeverity: 0,
+    lastContactRacerId: null,
   }));
   const player = states[0];
 
@@ -71,6 +81,8 @@ export function createRace(
       if (state.finished) continue;
       state.totalTime += dt;
       state.currentLapTime += dt;
+      state.contactCooldown = Math.max(0, state.contactCooldown - dt);
+      state.lastContactSeverity = Math.max(0, state.lastContactSeverity - dt * 1.4);
 
       if (i === 0) {
         updatePlayer(state, control, dt, settings);
@@ -94,6 +106,7 @@ export function createRace(
         state.finishTime = state.totalTime;
       }
     }
+    applyCarContacts(states, track, settings);
 
     return snapshot();
   };
@@ -211,6 +224,54 @@ function nearestTrafficAhead(state: RacerState, states: RacerState[], trackLengt
   return nearest;
 }
 
+export function analyzeCarContact(a: RacerState, b: RacerState, trackLengthKm: number): { overlap: boolean; severity: number; longitudinalMeters: number; lateralMeters: number } {
+  const longitudinalMeters = Math.round(longitudinalSeparation(a.progress, b.progress) * trackLengthKm * 1000 * 10) / 10;
+  const lateralMeters = Math.round(Math.abs(a.lateral - b.lateral) * 10) / 10;
+  const longitudinalOverlap = clamp((6.5 - longitudinalMeters) / 6.5, 0, 1);
+  const lateralOverlap = clamp((1.9 - lateralMeters) / 1.9, 0, 1);
+  const relativeSpeed = Math.abs(a.speed - b.speed);
+  const severity = longitudinalOverlap > 0 && lateralOverlap > 0 ? clamp(longitudinalOverlap * 0.48 + lateralOverlap * 0.34 + relativeSpeed / 220, 0.06, 1) : 0;
+  return {
+    overlap: severity > 0,
+    severity: Math.round(severity * 1000) / 1000,
+    longitudinalMeters,
+    lateralMeters,
+  };
+}
+
+function applyCarContacts(states: RacerState[], track: TrackDefinition, settings: GameSettings): void {
+  for (let aIndex = 0; aIndex < states.length; aIndex += 1) {
+    const a = states[aIndex];
+    if (a.finished) continue;
+    for (let bIndex = aIndex + 1; bIndex < states.length; bIndex += 1) {
+      const b = states[bIndex];
+      if (b.finished || a.contactCooldown > 0 || b.contactCooldown > 0) continue;
+      const contact = analyzeCarContact(a, b, track.lengthKm);
+      if (!contact.overlap) continue;
+      applyContactToPair(a, b, contact.severity, settings);
+    }
+  }
+}
+
+function applyContactToPair(a: RacerState, b: RacerState, severity: number, settings: GameSettings): void {
+  const pushDirection = a.lateral <= b.lateral ? -1 : 1;
+  a.lateral = clamp(a.lateral + pushDirection * severity * 0.72, -5.4, 5.4);
+  b.lateral = clamp(b.lateral - pushDirection * severity * 0.72, -5.4, 5.4);
+  const faster = a.speed >= b.speed ? a : b;
+  const slower = faster === a ? b : a;
+  faster.speed *= 1 - severity * 0.18;
+  slower.speed *= 1 - severity * 0.08;
+  for (const racer of [a, b]) {
+    racer.contactCooldown = 0.48;
+    racer.contactEvents += 1;
+    racer.lastContactSeverity = severity;
+    racer.maxContactSeverity = Math.max(racer.maxContactSeverity, severity);
+    racer.lastContactRacerId = racer === a ? b.definition.id : a.definition.id;
+    if (settings.realisticDamage) racer.damage = Math.max(0, racer.damage - severity * 0.055);
+    if (settings.realisticTires) racer.tires = Math.max(0, racer.tires - severity * 0.018);
+  }
+}
+
 function progressInRange(progress: number, start: number, end: number): boolean {
   if (start <= end) return progress >= start && progress <= end;
   return progress >= start || progress <= end;
@@ -219,6 +280,11 @@ function progressInRange(progress: number, start: number, end: number): boolean 
 function forwardProgressDistance(from: number, to: number): number {
   const delta = to - from;
   return delta < 0 ? delta + 1 : delta;
+}
+
+function longitudinalSeparation(a: number, b: number): number {
+  const direct = Math.abs(a - b);
+  return Math.min(direct, 1 - direct);
 }
 
 function defaultRacecraft(): CpuRacecraft {

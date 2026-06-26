@@ -45,6 +45,7 @@ let captionIndex = 0;
 let lightTimer = 0;
 let lightsOn = 0;
 let lastRadio = '';
+let lastContactRadioEvent = 0;
 let campaignTrackIndex = 0;
 let uiBound = false;
 let replayRecorder: ReplayRecorder | null = null;
@@ -440,6 +441,8 @@ function startPreRace(): void {
   saveSettings();
   gameState = 'prerace';
   lightsOn = 0;
+  lastContactRadioEvent = 0;
+  lastRadio = '';
   updateStartLights();
   startLights.classList.add('active');
   showScreen(null);
@@ -665,10 +668,10 @@ function updateTrackMap(snapshot: RaceSnapshot): void {
   nextBrakeMeters = summary.nextBrakeMeters;
   brakeUrgency = summary.brakeUrgency;
   gapAhead.textContent = summary.nearestAhead
-    ? `Up ${summary.nearestAhead.shortName} ${formatMeters(summary.nearestAhead.meters)}${summary.nearestAhead.closing ? ' closing' : ''}`
+    ? `Up ${summary.nearestAhead.shortName} ${formatMeters(summary.nearestAhead.meters)}${summary.nearestAhead.closing ? ' +' : ''}`
     : 'Up clear';
   gapBehind.textContent = summary.nearestBehind
-    ? `Back ${summary.nearestBehind.shortName} ${formatMeters(summary.nearestBehind.meters)}${summary.nearestBehind.closing ? ' closing' : ''}`
+    ? `Back ${summary.nearestBehind.shortName} ${formatMeters(summary.nearestBehind.meters)}${summary.nearestBehind.closing ? ' +' : ''}`
     : 'Back clear';
   raceHint.textContent = summary.sideBySide
     ? `Side ${summary.sideBySide.shortName} ${summary.sideBySide.side}`
@@ -679,13 +682,18 @@ function updateTrackMap(snapshot: RaceSnapshot): void {
 }
 
 function updateRadio(snapshot: RaceSnapshot): void {
+  const contactWarning = snapshot.player.contactEvents > lastContactRadioEvent && snapshot.player.lastContactSeverity > 0.22;
   const warnings: Array<[string, string]> = [
     ['damage', snapshot.player.damage < 0.45 ? 'Radio' : ''],
     ['tires', snapshot.player.tires < 0.38 ? 'Radio' : ''],
   ];
   const damageWarning = warnings[0][1] && lastRadio !== 'damage';
   const tireWarning = warnings[1][1] && lastRadio !== 'tires';
-  if (damageWarning) {
+  if (contactWarning) {
+    lastContactRadioEvent = snapshot.player.contactEvents;
+    lastRadio = 'contact';
+    showCaption('Radio', 'Contact confirmed. Check the front wing and give them space.');
+  } else if (damageWarning) {
     lastRadio = 'damage';
     showCaption('Radio', 'Damage is climbing. Stay off the outside kerbs and bring it home.');
   } else if (tireWarning) {
@@ -783,6 +791,23 @@ function forcePodiumForSmoke(finaleMode = false): void {
     renderPodium();
     showCaption('Arthur Bell', fill(dialogue.podium[0][1]));
   }
+}
+
+function forceContactForSmoke(): void {
+  if (!latestSnapshot || gameState !== 'race') return;
+  const rival = latestSnapshot.racers.find((racer) => racer.definition.id !== playerTemplate.id && !racer.finished);
+  if (!rival) return;
+  const player = latestSnapshot.player;
+  player.distance = Math.max(player.distance, 0.18);
+  player.progress = (0.985 + player.distance) % 1;
+  player.lateral = 0;
+  player.speed = Math.max(player.speed, 48);
+  player.contactCooldown = 0;
+  rival.distance = player.distance + 0.007;
+  rival.progress = (0.985 - 0.006 + rival.distance) % 1;
+  rival.lateral = 0.55;
+  rival.speed = Math.max(34, player.speed - 14);
+  rival.contactCooldown = 0;
 }
 
 function stagePodiumCeremony(racerIds: string[], finaleMode: boolean): void {
@@ -1013,6 +1038,14 @@ function exposeDebug(): void {
       brakeUrgency,
     },
     cpuRacecraft,
+    contact: {
+      playerEvents: latestSnapshot?.player.contactEvents ?? 0,
+      playerLastSeverity: latestSnapshot?.player.lastContactSeverity ?? 0,
+      playerMaxSeverity: latestSnapshot?.player.maxContactSeverity ?? 0,
+      playerLastRacerId: latestSnapshot?.player.lastContactRacerId ?? null,
+      totalEvents: latestSnapshot ? latestSnapshot.racers.reduce((total, racer) => total + racer.contactEvents, 0) : 0,
+      maxSeverity: latestSnapshot ? Math.max(0, ...latestSnapshot.racers.map((racer) => racer.maxContactSeverity)) : 0,
+    },
     campaignLeader: campaignLeader(campaignScores)?.name ?? null,
     sceneDetails: sceneBuild?.detailStats ?? null,
     podium: {
@@ -1039,6 +1072,7 @@ function exposeDebug(): void {
     replay: lastReplay,
     debug: {
       forcePodium: forcePodiumForSmoke,
+      forceContact: forceContactForSmoke,
     },
   };
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0 - 2026-06-26
+
+- Added lightweight car-contact detection using visual track progress and lateral overlap.
+- Added speed, tire, and damage penalties for realistic contact, with cooldowns to prevent repeated contact spam.
+- Added player contact radio feedback and debug metrics for contact events and severity.
+- Added unit and browser smoke coverage for contact, grid safety, and cooldown behavior.
+
 ## 1.4.0 - 2026-06-26
 
 - Added active-race guidance for closing rivals, side-by-side threats, and upcoming braking zones.

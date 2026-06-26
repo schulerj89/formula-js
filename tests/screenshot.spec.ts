@@ -31,6 +31,8 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await page.waitForTimeout(8000);
   await page.keyboard.up('Space');
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'race');
+  await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.debug?.forceContact?.());
+  await page.waitForFunction(() => ((window as any).__GRIDLINE_APEX__?.metrics?.contact?.playerEvents ?? 0) > 0);
   await expect(page.locator('#lap')).toHaveText('1/1');
   await expect(page.locator('#raceHint')).toBeVisible();
   const viewport = page.viewportSize();
@@ -75,6 +77,11 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.cpuRacecraft.targetSpeedMax).toBeGreaterThan(40);
   expect(metrics.cpuRacecraft.maxCornerLoad).toBeGreaterThanOrEqual(0);
   expect(metrics.cpuRacecraft.overtakeCount).toBeGreaterThanOrEqual(0);
+  expect(metrics.contact.playerEvents).toBeGreaterThan(0);
+  expect(metrics.contact.playerMaxSeverity).toBeGreaterThan(0);
+  expect(metrics.contact.maxSeverity).toBeGreaterThanOrEqual(metrics.contact.playerMaxSeverity);
+  expect(metrics.contact.playerLastRacerId).toBeTruthy();
+  expect(metrics.contact.totalEvents).toBeGreaterThanOrEqual(metrics.contact.playerEvents);
   expect(metrics.sceneDetails.barrierPanels).toBe(320);
   expect(metrics.sceneDetails.sponsorBoards).toBe(72);
   expect(metrics.sceneDetails.tireStacks).toBeGreaterThan(40);

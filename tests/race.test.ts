@@ -6,7 +6,7 @@ import { formulaAssetManifest } from '../src/data/assets';
 import { bodyPaintOptions, helmetPaintOptions } from '../src/data/customization';
 import { elevenLabsSongAssets, elevenLabsVoiceAssets, matchVoiceAsset } from '../src/data/elevenlabs';
 import { analyzeRaceAudio, RaceAudio } from '../src/game/audio';
-import { analyzeCpuRacecraft, createRace, type RacerState } from '../src/game/race';
+import { analyzeCarContact, analyzeCpuRacecraft, createRace, type RacerState } from '../src/game/race';
 import { createTrackMapLayout, summarizeRaceReadability } from '../src/game/raceReadability';
 import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
@@ -338,6 +338,88 @@ describe('race simulation', () => {
     expect(cpus.some((racer) => racer.racecraft.targetSpeed < 55)).toBe(true);
     expect(cpus.some((racer) => Math.abs(racer.racecraft.targetLateral) > 1)).toBe(true);
     expect(cpus.some((racer) => racer.tires < 0.99)).toBe(true);
+  });
+
+  it('detects close car overlap as contact severity', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const snapshot = createRace('timeAttack', tracks[0], racers, settings).snapshot();
+    const player = snapshot.player;
+    const rival = snapshot.racers[1];
+    player.distance = 0.25;
+    player.progress = 0.25;
+    player.lateral = 0;
+    player.speed = 58;
+    rival.distance = player.distance + 0.0012;
+    rival.progress = player.progress + 0.0012;
+    rival.lateral = 0.65;
+    rival.speed = 44;
+    const contact = analyzeCarContact(player, rival, tracks[0].lengthKm);
+    expect(contact.overlap).toBe(true);
+    expect(contact.longitudinalMeters).toBeLessThan(13);
+    expect(contact.lateralMeters).toBeLessThan(2.35);
+    expect(contact.severity).toBeGreaterThan(0.2);
+  });
+
+  it('does not count the staggered starting grid as contact', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    let snapshot = race.snapshot();
+    for (let i = 0; i < 30; i += 1) {
+      snapshot = race.update(1 / 30, { throttle: false, brake: true, steer: 0 });
+    }
+    expect(snapshot.racers.reduce((total, racer) => total + racer.contactEvents, 0)).toBe(0);
+    expect(snapshot.player.damage).toBe(1);
+  });
+
+  it('applies contact damage, tire loss, separation, and event counters', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    const initial = race.snapshot();
+    initial.player.distance = 0.25;
+    initial.player.progress = 0.25;
+    initial.player.lateral = 0;
+    initial.player.speed = 58;
+    const rival = initial.racers[1];
+    rival.distance = 0.257;
+    rival.progress = 0.986;
+    rival.lateral = 0.5;
+    rival.speed = 44;
+
+    const snapshot = race.update(1 / 60, { throttle: false, brake: false, steer: 0 });
+
+    expect(snapshot.player.contactEvents).toBeGreaterThan(0);
+    expect(rival.contactEvents).toBeGreaterThan(0);
+    expect(snapshot.player.lastContactRacerId).toBe(rival.definition.id);
+    expect(snapshot.player.maxContactSeverity).toBeGreaterThan(0);
+    expect(snapshot.player.damage).toBeLessThan(1);
+    expect(snapshot.player.tires).toBeLessThan(1);
+    expect(snapshot.player.speed).toBeLessThan(58);
+    expect(Math.abs(snapshot.player.lateral - rival.lateral)).toBeGreaterThan(0.7);
+  });
+
+  it('suppresses repeated contact while either car is cooling down', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    const initial = race.snapshot();
+    initial.player.distance = 0.25;
+    initial.player.progress = 0.25;
+    initial.player.lateral = 0;
+    initial.player.speed = 50;
+    const rival = initial.racers[1];
+    rival.distance = 0.257;
+    rival.progress = 0.986;
+    rival.lateral = 0.45;
+    rival.speed = 42;
+
+    const first = race.update(1 / 60, { throttle: false, brake: false, steer: 0 });
+    const eventsAfterFirst = first.player.contactEvents;
+    rival.distance = first.player.distance + 0.007;
+    rival.progress = first.player.progress + 0.001;
+    rival.lateral = first.player.lateral + 0.4;
+    const second = race.update(1 / 60, { throttle: false, brake: false, steer: 0 });
+
+    expect(eventsAfterFirst).toBeGreaterThan(0);
+    expect(second.player.contactEvents).toBe(eventsAfterFirst);
   });
 });
 
