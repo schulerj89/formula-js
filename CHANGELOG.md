@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.31.1 - 2026-06-26
+
+- Added an `audio:doctor` command that checks ElevenLabs API-key and voice-ID readiness without printing secrets.
+- Sanitized ElevenLabs provider error output so failed generation reports status and remediation without echoing response bodies.
+- Recorded that current MP3 generation is blocked by an invalid local API key and missing announcer/radio voice IDs.
+
 ## 1.31.0 - 2026-06-26
 
 - Added a compact visible title flyover label so the rotating menu camera names the currently previewed track without reopening title clutter.

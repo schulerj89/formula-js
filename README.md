@@ -12,6 +12,7 @@ Mobile-first Three.js formula racing game.
 - `npm run audio:check` verifies the ElevenLabs manifest and generated MP3 status.
 - `npm run audio:generate` generates ElevenLabs MP3s when all voice IDs and an API key are configured locally.
 - `npm run audio:generate:partial` explicitly allows generation with missing voice IDs for a music-only or partial pass.
+- `npm run audio:doctor` checks ElevenLabs credential readiness without printing secrets.
 - `npm run assets:meshy:preview` starts the Meshy preview workflow from the formula-kit manifest when a Meshy key is configured locally.
 
 ## Local Audio Credentials

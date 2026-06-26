@@ -1,6 +1,6 @@
 {
   "name": "formula-js",
-  "version": "1.31.0",
+  "version": "1.31.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
     "audio:plan": "node scripts/generate-elevenlabs-assets.mjs",
     "audio:generate": "node scripts/generate-elevenlabs-assets.mjs --generate",
     "audio:generate:partial": "node scripts/generate-elevenlabs-assets.mjs --generate --allow-partial",
+    "audio:doctor": "node scripts/generate-elevenlabs-assets.mjs --doctor",
     "audio:check": "node scripts/verify-elevenlabs-assets.mjs",
     "assets:meshy:preview": "node C:/Users/joshs/.codex/skills/meshy-asset-pipeline/scripts/meshy_text_to_3d_manifest.mjs tools/meshy/formula-kit.manifest.json --preview-only"
   },

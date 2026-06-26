@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.join(root, 'public', 'audio', 'elevenlabs');
+const doctor = process.argv.includes('--doctor');
 const dryRun = !process.argv.includes('--generate');
 const allowPartial = process.argv.includes('--allow-partial');
 const localEnvPaths = [
@@ -134,73 +135,78 @@ const songs = [
 ];
 
 validateVoiceIdentity();
-if (!dryRun) await loadLocalEnvFiles();
-await mkdir(outDir, { recursive: true });
-const apiKey = dryRun ? '' : await loadApiKey();
-const missingVoiceLines = voiceLines.filter((line) => !process.env[line.voiceEnv] && !existsSync(path.join(outDir, `${line.id}.mp3`)));
-if (!dryRun && missingVoiceLines.length > 0 && !allowPartial) {
-  const missingVoiceEnvs = [...new Set(missingVoiceLines.map((line) => line.voiceEnv))].sort();
-  throw new Error(
-    `Missing ElevenLabs voice IDs for ${missingVoiceEnvs.join(', ')}. Set them in the environment or an ignored local env file, or rerun with --allow-partial.`,
-  );
-}
+if (!dryRun || doctor) await loadLocalEnvFiles();
+if (doctor) {
+  const doctorApiKey = await loadApiKey();
+  if (!(await runDoctor(doctorApiKey))) process.exitCode = 1;
+} else {
+  await mkdir(outDir, { recursive: true });
+  const apiKey = dryRun ? '' : await loadApiKey();
+  const missingVoiceLines = voiceLines.filter((line) => !process.env[line.voiceEnv] && !existsSync(path.join(outDir, `${line.id}.mp3`)));
+  if (!dryRun && missingVoiceLines.length > 0 && !allowPartial) {
+    const missingVoiceEnvs = [...new Set(missingVoiceLines.map((line) => line.voiceEnv))].sort();
+    throw new Error(
+      `Missing ElevenLabs voice IDs for ${missingVoiceEnvs.join(', ')}. Set them in the environment or an ignored local env file, or rerun with --allow-partial.`,
+    );
+  }
 
-const manifest = {
-  generatedAt: new Date().toISOString(),
-  dryRun,
-  sources: {
-    tts: 'https://api.elevenlabs.io/v1/text-to-speech/:voice_id',
-    music: 'https://api.elevenlabs.io/v1/music',
-  },
-  voiceLines: [],
-  songs: [],
-};
-
-for (const line of voiceLines) {
-  const voiceId = process.env[line.voiceEnv];
-  const file = path.join(outDir, `${line.id}.mp3`);
-  const generated = existsSync(file);
-  const status = generated ? 'generated' : dryRun ? 'planned' : voiceId ? 'generated' : 'missing_voice_id';
-  manifest.voiceLines.push({
-    ...line,
-    file: `public/audio/elevenlabs/${line.id}.mp3`,
-    status,
-  });
-  if (dryRun || !voiceId || generated) continue;
-  const bytes = await postAudio(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
-    text: line.text,
-    model_id: 'eleven_multilingual_v2',
-    voice_settings: {
-      stability: line.speaker === 'Mags Whitlow' ? 0.42 : 0.58,
-      similarity_boost: line.speaker === 'Radio' ? 0.7 : 0.78,
-      style: line.speaker === 'Radio' ? 0.08 : 0.35,
-      use_speaker_boost: true,
+  const manifest = {
+    generatedAt: new Date().toISOString(),
+    dryRun,
+    sources: {
+      tts: 'https://api.elevenlabs.io/v1/text-to-speech/:voice_id',
+      music: 'https://api.elevenlabs.io/v1/music',
     },
-  });
-  await writeFile(file, bytes);
-}
+    voiceLines: [],
+    songs: [],
+  };
 
-for (const song of songs) {
-  const file = path.join(outDir, `${song.id}.mp3`);
-  const generated = existsSync(file);
-  manifest.songs.push({
-    ...song,
-    file: `public/audio/elevenlabs/${song.id}.mp3`,
-    status: generated || !dryRun ? 'generated' : 'planned',
-  });
-  if (dryRun || generated) continue;
-  const bytes = await postAudio('https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128', {
-    prompt: song.prompt,
-    music_length_ms: song.music_length_ms,
-    model_id: 'music_v1',
-    force_instrumental: true,
-    store_for_inpainting: false,
-  });
-  await writeFile(file, bytes);
-}
+  for (const line of voiceLines) {
+    const voiceId = process.env[line.voiceEnv];
+    const file = path.join(outDir, `${line.id}.mp3`);
+    const generated = existsSync(file);
+    const status = generated ? 'generated' : dryRun ? 'planned' : voiceId ? 'generated' : 'missing_voice_id';
+    manifest.voiceLines.push({
+      ...line,
+      file: `public/audio/elevenlabs/${line.id}.mp3`,
+      status,
+    });
+    if (dryRun || !voiceId || generated) continue;
+    const bytes = await postAudio(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
+      text: line.text,
+      model_id: 'eleven_multilingual_v2',
+      voice_settings: {
+        stability: line.speaker === 'Mags Whitlow' ? 0.42 : 0.58,
+        similarity_boost: line.speaker === 'Radio' ? 0.7 : 0.78,
+        style: line.speaker === 'Radio' ? 0.08 : 0.35,
+        use_speaker_boost: true,
+      },
+    });
+    await writeFile(file, bytes);
+  }
 
-await writeFile(path.join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-console.log(`${dryRun ? 'Planned' : 'Generated'} ${manifest.voiceLines.length} voice lines and ${manifest.songs.length} songs in ${path.relative(root, outDir)}`);
+  for (const song of songs) {
+    const file = path.join(outDir, `${song.id}.mp3`);
+    const generated = existsSync(file);
+    manifest.songs.push({
+      ...song,
+      file: `public/audio/elevenlabs/${song.id}.mp3`,
+      status: generated || !dryRun ? 'generated' : 'planned',
+    });
+    if (dryRun || generated) continue;
+    const bytes = await postAudio('https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128', {
+      prompt: song.prompt,
+      music_length_ms: song.music_length_ms,
+      model_id: 'music_v1',
+      force_instrumental: true,
+      store_for_inpainting: false,
+    });
+    await writeFile(file, bytes);
+  }
+
+  await writeFile(path.join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  console.log(`${dryRun ? 'Planned' : 'Generated'} ${manifest.voiceLines.length} voice lines and ${manifest.songs.length} songs in ${path.relative(root, outDir)}`);
+}
 
 function validateVoiceIdentity() {
   const voiceEnvBySpeaker = new Map([
@@ -227,9 +233,43 @@ async function postAudio(url, body) {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`ElevenLabs request failed with ${response.status}: ${await response.text()}`);
+    throw new Error(summarizeElevenLabsFailure(response.status));
   }
   return Buffer.from(await response.arrayBuffer());
+}
+
+async function runDoctor(doctorApiKey) {
+  const missingVoiceEnvs = [...new Set(voiceLines.filter((line) => !process.env[line.voiceEnv]).map((line) => line.voiceEnv))].sort();
+  const checks = [
+    ['API key configured', Boolean(doctorApiKey)],
+    ['Arthur voice ID configured', Boolean(process.env.ELEVENLABS_ARTHUR_VOICE_ID)],
+    ['Mags voice ID configured', Boolean(process.env.ELEVENLABS_MAGS_VOICE_ID)],
+    ['Radio voice ID configured', Boolean(process.env.ELEVENLABS_RADIO_VOICE_ID)],
+  ];
+  const providerStatus = doctorApiKey ? await checkApiKey(doctorApiKey) : { ok: false, detail: 'missing API key' };
+  for (const [label, ok] of checks) console.log(`${ok ? 'OK' : 'MISSING'} ${label}`);
+  console.log(`${providerStatus.ok ? 'OK' : 'ERROR'} ElevenLabs authentication ${providerStatus.detail}`);
+  if (missingVoiceEnvs.length > 0) console.log(`Missing voice envs: ${missingVoiceEnvs.join(', ')}`);
+  return Boolean(doctorApiKey) && providerStatus.ok && missingVoiceEnvs.length === 0;
+}
+
+async function checkApiKey(doctorApiKey) {
+  try {
+    const response = await fetch('https://api.elevenlabs.io/v1/user/subscription', {
+      headers: { 'xi-api-key': doctorApiKey },
+    });
+    await response.arrayBuffer().catch(() => undefined);
+    if (response.ok) return { ok: true, detail: 'ready' };
+    return { ok: false, detail: summarizeElevenLabsFailure(response.status) };
+  } catch {
+    return { ok: false, detail: 'network check failed' };
+  }
+}
+
+function summarizeElevenLabsFailure(status) {
+  if (status === 401 || status === 403) return `failed with ${status}; check ELEVENLABS_API_KEY and account access`;
+  if (status === 429) return 'failed with 429; provider rate limit or quota reached';
+  return `failed with ${status}; provider response body omitted`;
 }
 
 async function loadApiKey() {
