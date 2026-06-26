@@ -6,7 +6,7 @@ import { formulaAssetManifest } from '../src/data/assets';
 import { bodyPaintOptions, helmetPaintOptions } from '../src/data/customization';
 import { elevenLabsSongAssets, elevenLabsVoiceAssets, matchVoiceAsset } from '../src/data/elevenlabs';
 import { analyzeRaceAudio, RaceAudio } from '../src/game/audio';
-import { createRace } from '../src/game/race';
+import { analyzeCpuRacecraft, createRace, type RacerState } from '../src/game/race';
 import { createTrackMapLayout, summarizeRaceReadability } from '../src/game/raceReadability';
 import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
@@ -235,6 +235,19 @@ describe('race simulation', () => {
     expect(snapshot.player.totalTime).toBeGreaterThanOrEqual(7.9);
   });
 
+  it('does not award driven distance while the player is stopped', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    let snapshot = race.snapshot();
+    for (let i = 0; i < 20 * 30; i += 1) {
+      snapshot = race.update(1 / 30, { throttle: false, brake: true, steer: 0 });
+    }
+    expect(snapshot.player.speed).toBe(0);
+    expect(snapshot.player.distance).toBe(0);
+    expect(snapshot.player.lap).toBe(0);
+    expect(snapshot.player.finished).toBe(false);
+  });
+
   it('requires a plausible driven lap before completing time attack', () => {
     const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
     const race = createRace('timeAttack', tracks[0], racers, settings);
@@ -263,6 +276,35 @@ describe('race simulation', () => {
     expect([summary.nearestAhead?.shortName, summary.nearestBehind?.shortName].filter(Boolean).length).toBeGreaterThan(0);
     expect(summary.nearestAhead?.racerId).not.toBe('player');
     expect(summary.nearestBehind?.racerId).not.toBe('player');
+  });
+
+  it('gives CPU racers corner braking and overtake intent', () => {
+    const track = tracks[0];
+    const base = createRace('timeAttack', track, [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers], settings).snapshot().racers;
+    const chaser = { ...base[1], progress: track.kerbZones[0][0] + 0.01, distance: 0.2, speed: 70 };
+    const traffic = { ...base[2], distance: chaser.distance + 0.01, speed: 42 };
+    const clearAhead = { ...base[3], distance: chaser.distance + 0.2 };
+    const intent = analyzeCpuRacecraft(chaser as RacerState, 1, [base[0], chaser, traffic, clearAhead] as RacerState[], track);
+    expect(intent.cornerLoad).toBeGreaterThan(0.5);
+    expect(intent.braking).toBe(true);
+    expect(intent.overtakeLane).not.toBe(0);
+    expect(intent.trafficGapMeters).toBeGreaterThan(0);
+    expect(Math.abs(intent.targetLateral)).toBeGreaterThan(0.75);
+    expect(intent.targetSpeed).toBeLessThan(70);
+  });
+
+  it('keeps live CPU racecraft active during a race stint', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    let snapshot = race.snapshot();
+    for (let i = 0; i < 32 * 30; i += 1) {
+      snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: Math.sin(i / 20) * 0.2 });
+    }
+    const cpus = snapshot.racers.filter((racer) => racer.definition.id !== 'player');
+    expect(cpus.some((racer) => racer.racecraft.cornerLoad > 0.4)).toBe(true);
+    expect(cpus.some((racer) => racer.racecraft.targetSpeed < 55)).toBe(true);
+    expect(cpus.some((racer) => Math.abs(racer.racecraft.targetLateral) > 1)).toBe(true);
+    expect(cpus.some((racer) => racer.tires < 0.99)).toBe(true);
   });
 });
 

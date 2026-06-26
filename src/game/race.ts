@@ -14,6 +14,16 @@ export interface RacerState {
   tires: number;
   finished: boolean;
   finishTime: number;
+  racecraft: CpuRacecraft;
+}
+
+export interface CpuRacecraft {
+  targetSpeed: number;
+  targetLateral: number;
+  cornerLoad: number;
+  braking: boolean;
+  overtakeLane: -1 | 0 | 1;
+  trafficGapMeters: number | null;
 }
 
 export interface RaceControl {
@@ -51,6 +61,7 @@ export function createRace(
     tires: 1,
     finished: false,
     finishTime: Number.POSITIVE_INFINITY,
+    racecraft: defaultRacecraft(),
   }));
   const player = states[0];
 
@@ -64,10 +75,10 @@ export function createRace(
       if (i === 0) {
         updatePlayer(state, control, dt, settings);
       } else {
-        updateCpu(state, i, dt, track.difficulty);
+        updateCpu(state, i, dt, track, states);
       }
 
-      const lapDistance = Math.max(0.0001, state.speed * dt / (track.lengthKm * 1000));
+      const lapDistance = Math.max(0, state.speed * dt / (track.lengthKm * 1000));
       const previousLap = Math.floor(state.distance);
       state.distance += lapDistance;
       state.progress = (0.985 - i * 0.006 + state.distance) % 1;
@@ -133,12 +144,92 @@ function updatePlayer(state: RacerState, control: RaceControl, dt: number, setti
   state.speed = Math.min(state.speed, conditionLimit);
 }
 
-function updateCpu(state: RacerState, index: number, dt: number, difficulty: number): void {
-  const wave = Math.sin(state.totalTime * 0.8 + index * 1.7) * 0.5 + 0.5;
-  const target = 47 + state.definition.skill * 19 + difficulty * 2 - wave * 5;
-  state.speed += (target - state.speed) * dt * 0.65;
-  state.lateral = Math.sin(state.totalTime * 0.7 + index) * 2.2;
-  state.tires = Math.max(0.15, state.tires - dt * 0.0008);
+function updateCpu(state: RacerState, index: number, dt: number, track: TrackDefinition, states: RacerState[]): void {
+  const racecraft = analyzeCpuRacecraft(state, index, states, track);
+  state.racecraft = racecraft;
+  const speedResponse = racecraft.braking ? 1.55 : 0.72;
+  state.speed += (racecraft.targetSpeed - state.speed) * dt * speedResponse;
+  state.speed = clamp(state.speed, 0, 84);
+  const lateralResponse = Math.min(1, dt * (racecraft.overtakeLane ? 2.6 : 1.8));
+  state.lateral += (racecraft.targetLateral - state.lateral) * lateralResponse;
+  const lateralLoad = Math.abs(state.lateral) / 4.8;
+  state.tires = Math.max(0.15, state.tires - dt * (0.0007 + racecraft.cornerLoad * 0.0012 + lateralLoad * 0.0005));
+  if (Math.abs(state.lateral) > 4.8) state.damage = Math.max(0.35, state.damage - dt * 0.01);
+}
+
+export function analyzeCpuRacecraft(state: RacerState, index: number, states: RacerState[], track: TrackDefinition): CpuRacecraft {
+  const cornerLoad = cornerPressure(state.progress, track);
+  const baseSpeed = 50 + state.definition.skill * 18 + track.difficulty * 1.6;
+  const cornerSpeedLoss = cornerLoad * (14 + track.difficulty * 2.4);
+  const lane = ((index % 3) - 1) * 1.05;
+  const cornerSide = index % 2 === 0 ? -1 : 1;
+  let targetLateral = lane * (1 - cornerLoad) + cornerSide * 2.65 * cornerLoad;
+  let targetSpeed = baseSpeed - cornerSpeedLoss;
+  let overtakeLane: -1 | 0 | 1 = 0;
+  let trafficGapMeters: number | null = null;
+  const traffic = nearestTrafficAhead(state, states, track.lengthKm);
+  if (traffic && traffic.gapMeters < 82 && state.definition.skill >= traffic.racer.definition.skill - 0.05) {
+    overtakeLane = index % 2 === 0 ? 1 : -1;
+    trafficGapMeters = traffic.gapMeters;
+    targetLateral += overtakeLane * (1.25 + (82 - traffic.gapMeters) / 82);
+    targetSpeed += 4.5;
+  }
+  targetSpeed *= 0.82 + state.tires * 0.18;
+  return {
+    targetSpeed: clamp(targetSpeed, 32, 82),
+    targetLateral: clamp(targetLateral, -4.25, 4.25),
+    cornerLoad,
+    braking: cornerLoad > 0.58 && state.speed > targetSpeed + 1.5,
+    overtakeLane,
+    trafficGapMeters,
+  };
+}
+
+function cornerPressure(progress: number, track: TrackDefinition): number {
+  let pressure = 0;
+  for (const [start, end] of track.kerbZones) {
+    const toEntry = forwardProgressDistance(progress, start);
+    const fromExit = forwardProgressDistance(end, progress);
+    const inCorner = progressInRange(progress, start, end);
+    if (inCorner) pressure = Math.max(pressure, 1);
+    if (toEntry < 0.06) pressure = Math.max(pressure, (1 - toEntry / 0.06) * 0.78);
+    if (fromExit < 0.035) pressure = Math.max(pressure, (1 - fromExit / 0.035) * 0.42);
+  }
+  return Math.round(clamp(pressure, 0, 1) * 1000) / 1000;
+}
+
+function nearestTrafficAhead(state: RacerState, states: RacerState[], trackLengthKm: number): { racer: RacerState; gapMeters: number } | null {
+  let nearest: { racer: RacerState; gapMeters: number } | null = null;
+  for (const candidate of states) {
+    if (candidate === state || candidate.finished) continue;
+    let gap = candidate.distance - state.distance;
+    if (gap < 0) gap += 1;
+    if (gap <= 0 || gap > 0.035) continue;
+    const gapMeters = Math.round(gap * trackLengthKm * 1000);
+    if (!nearest || gapMeters < nearest.gapMeters) nearest = { racer: candidate, gapMeters };
+  }
+  return nearest;
+}
+
+function progressInRange(progress: number, start: number, end: number): boolean {
+  if (start <= end) return progress >= start && progress <= end;
+  return progress >= start || progress <= end;
+}
+
+function forwardProgressDistance(from: number, to: number): number {
+  const delta = to - from;
+  return delta < 0 ? delta + 1 : delta;
+}
+
+function defaultRacecraft(): CpuRacecraft {
+  return {
+    targetSpeed: 0,
+    targetLateral: 0,
+    cornerLoad: 0,
+    braking: false,
+    overtakeLane: 0,
+    trafficGapMeters: null,
+  };
 }
 
 function compareRacePosition(a: RacerState, b: RacerState): number {

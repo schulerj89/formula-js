@@ -61,6 +61,9 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.raceReadability.trackMapDots).toBe(8);
   expect(metrics.raceReadability.nearestAheadMeters ?? 0).toBeGreaterThanOrEqual(0);
   expect(metrics.raceReadability.nearestBehindMeters ?? 0).toBeGreaterThanOrEqual(0);
+  expect(metrics.cpuRacecraft.targetSpeedMax).toBeGreaterThan(40);
+  expect(metrics.cpuRacecraft.maxCornerLoad).toBeGreaterThanOrEqual(0);
+  expect(metrics.cpuRacecraft.overtakeCount).toBeGreaterThanOrEqual(0);
   expect(metrics.sceneDetails.barrierPanels).toBe(320);
   expect(metrics.sceneDetails.sponsorBoards).toBe(72);
   expect(metrics.sceneDetails.tireStacks).toBeGreaterThan(40);

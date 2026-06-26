@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0 - 2026-06-26
+
+- Added CPU racecraft intent for corner braking, track-aware racing lines, traffic gaps, and overtaking lanes.
+- Exposed CPU braking, overtake, corner-load, and target-speed metrics in the debug API.
+- Fixed stopped racers gaining distance from a minimum lap tick.
+- Added unit and browser smoke coverage for active CPU racecraft.
+
 ## 1.2.0 - 2026-06-26
 
 - Added a live mobile race readout with an SVG track map, player/rival dots, and nearest ahead/behind gaps.

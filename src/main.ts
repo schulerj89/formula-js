@@ -940,6 +940,7 @@ function exposeDebug(): void {
   const p95 = percentile(sortedFrameTimes, 0.95);
   const worst = sortedFrameTimes[sortedFrameTimes.length - 1] ?? 0;
   const fps = p50 > 0 ? 1 / p50 : 0;
+  const cpuRacecraft = summarizeCpuRacecraft(latestSnapshot);
   const metrics = {
     calls: renderer.info.render.calls,
     triangles: renderer.info.render.triangles,
@@ -972,6 +973,7 @@ function exposeDebug(): void {
       nearestAheadMeters,
       nearestBehindMeters,
     },
+    cpuRacecraft,
     campaignLeader: campaignLeader(campaignScores)?.name ?? null,
     sceneDetails: sceneBuild?.detailStats ?? null,
     podium: {
@@ -999,6 +1001,27 @@ function exposeDebug(): void {
     debug: {
       forcePodium: forcePodiumForSmoke,
     },
+  };
+}
+
+function summarizeCpuRacecraft(snapshot: RaceSnapshot | null): {
+  brakingCount: number;
+  overtakeCount: number;
+  maxCornerLoad: number;
+  trafficGapMeters: number | null;
+  targetSpeedMax: number;
+} {
+  if (!snapshot) {
+    return { brakingCount: 0, overtakeCount: 0, maxCornerLoad: 0, trafficGapMeters: null, targetSpeedMax: 0 };
+  }
+  const cpus = snapshot.racers.filter((racer) => racer.definition.id !== playerTemplate.id);
+  const gaps = cpus.map((racer) => racer.racecraft.trafficGapMeters).filter((gap): gap is number => gap !== null);
+  return {
+    brakingCount: cpus.filter((racer) => racer.racecraft.braking).length,
+    overtakeCount: cpus.filter((racer) => racer.racecraft.overtakeLane !== 0).length,
+    maxCornerLoad: Math.round(Math.max(0, ...cpus.map((racer) => racer.racecraft.cornerLoad)) * 1000) / 1000,
+    trafficGapMeters: gaps.length ? Math.min(...gaps) : null,
+    targetSpeedMax: Math.round(Math.max(0, ...cpus.map((racer) => racer.racecraft.targetSpeed))),
   };
 }
 
