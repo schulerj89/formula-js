@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 - 2026-06-26
+
+- Generated Meshy preview GLBs for the formula chassis, wheel, and driver kit under the per-asset byte cap.
+- Added a non-blocking GLB asset manager with cloned resources, procedural fallback, and debug asset-status metrics.
+- Enabled generated formula cars in high-detail mode while preserving procedural cars for battery/balanced modes.
+- Updated browser smoke coverage to exercise the generated runtime path and revised performance budgets.
+
 ## 0.5.0 - 2026-06-26
 
 - Added a mobile-readable five-red-light pre-race start sequence with countdown metrics.

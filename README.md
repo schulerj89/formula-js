@@ -23,9 +23,9 @@ Mobile-first Three.js formula racing game.
 - Procedural menu, pre-race, podium, and finale music with no music during active racing.
 - Announcer/radio speech hooks plus an ElevenLabs asset pipeline manifest.
 - Player garage paint swatches for body and helmet customization.
-- GPT-image reference art and a Meshy-ready manifest for modular chassis, wheel, and driver GLBs.
+- GPT-image reference art, Meshy preview GLBs, and a runtime loader for modular chassis, wheel, and driver assets.
 - Four procedural race circuits with red/white kerbs, trees, buildings, and landmarks.
 - Player plus seven CPU drivers with static names.
 - Press-to-go or split brake/go mobile controls.
 - Damage, tire wear, race radio, leaderboard toggle, standings, and performance overlay.
-- Procedural car, wheel, driver, and helmet models prepared for later Meshy asset swaps.
+- Procedural car fallback in battery/balanced modes, with generated GLB cars enabled in high-detail mode when all kit pieces load.

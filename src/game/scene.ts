@@ -9,8 +9,9 @@ export interface SceneBuild {
 }
 
 const roadWidth = 11;
+type CarFactory = (racer: RacerDefinition) => THREE.Group;
 
-export function buildRaceScene(scene: THREE.Scene, track: TrackDefinition, racers: RacerDefinition[]): SceneBuild {
+export function buildRaceScene(scene: THREE.Scene, track: TrackDefinition, racers: RacerDefinition[], carFactory: CarFactory = defaultCarFactory): SceneBuild {
   disposeScene(scene);
   scene.clear();
   scene.background = new THREE.Color(track.palette.sky);
@@ -31,7 +32,7 @@ export function buildRaceScene(scene: THREE.Scene, track: TrackDefinition, racer
 
   const cars = new Map<string, THREE.Group>();
   racers.forEach((racer, index) => {
-    const car = createFormulaCar(racer.color, racer.helmet);
+    const car = carFactory(racer);
     car.position.y = 0.2;
     const pose = path.poseAt(0.985 - index * 0.006, (index % 2 === 0 ? -1 : 1) * (1.4 + Math.floor(index / 2) * 1.6));
     car.position.copy(pose.position);
@@ -41,6 +42,10 @@ export function buildRaceScene(scene: THREE.Scene, track: TrackDefinition, racer
   });
 
   return { path, cars };
+}
+
+function defaultCarFactory(racer: RacerDefinition): THREE.Group {
+  return createFormulaCar(racer.color, racer.helmet);
 }
 
 function disposeScene(scene: THREE.Scene): void {

@@ -14,6 +14,11 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await expect(page.getByRole('heading', { name: 'Tutorial' })).toBeVisible();
   await page.getByRole('button', { name: 'Done' }).click();
 
+  await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.assetStatus?.generatedReady, null, { timeout: 20_000 });
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.locator('#performanceMode').selectOption('highDetail');
+  await page.getByRole('button', { name: 'Done' }).click();
+
   await page.getByRole('button', { name: 'Time Attack' }).click();
   await page.getByRole('button', { name: 'Race' }).click();
   await expect(page.locator('#startLights')).toBeVisible();
@@ -26,14 +31,19 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
 
   const metrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
   expect(metrics.triangles).toBeGreaterThan(30_000);
-  expect(metrics.triangles).toBeLessThan(180_000);
-  expect(metrics.calls).toBeLessThan(150);
-  expect(metrics.geometries).toBeLessThan(60);
+  expect(metrics.triangles).toBeLessThan(900_000);
+  expect(metrics.calls).toBeLessThan(320);
+  expect(metrics.geometries).toBeLessThan(220);
   expect(metrics.textures).toBeLessThan(20);
   expect(metrics.estimatedFps).toBeGreaterThan(0);
   expect(metrics.p95FrameMs).toBeGreaterThan(0);
   expect(metrics.audio.musicCue).toBe('Silent');
   expect(metrics.assetKit.referenceImages.chassis).toContain('formula-chassis-reference.png');
+  expect(metrics.assetStatus.generatedReady).toBe(true);
+  expect(metrics.assetStatus.runtimeMode).toBe('mixed');
+  expect(metrics.assetStatus.generatedCarsCreated).toBeGreaterThan(0);
+  expect(metrics.assetStatus.proceduralCarsCreated).toBeGreaterThan(0);
+  expect(metrics.assetStatus.loadedAssetIds.sort()).toEqual(['chassis', 'driver', 'wheel']);
   const settings = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.settings);
   expect(settings.bodyPaint).toBe('azure');
   expect(settings.helmetPaint).toBe('gold');

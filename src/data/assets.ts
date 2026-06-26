@@ -1,6 +1,6 @@
 export const formulaAssetManifest = {
   kit: 'formula-kit',
-  version: '0.4.0',
+  version: '0.6.0',
   runtimeFallback: 'procedural-formula-car',
   referenceImages: {
     chassis: '/assets/reference/formula-kit/formula-chassis-reference.png',
@@ -13,9 +13,14 @@ export const formulaAssetManifest = {
     driver: '/assets/formula-kit/formula-driver.glb',
   },
   budgets: {
-    chassisTriangles: 180_000,
-    wheelTriangles: 28_000,
-    driverTriangles: 90_000,
+    chassisTriangles: 60_000,
+    wheelTriangles: 12_000,
+    driverTriangles: 45_000,
     refinedAssetMaxBytes: 6_000_000,
+  },
+  generatedBytes: {
+    chassis: 4_162_428,
+    wheel: 547_468,
+    driver: 1_891_104,
   },
 };

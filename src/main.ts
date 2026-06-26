@@ -8,6 +8,7 @@ import { cpuRacers, playerTemplate } from './data/racers';
 import { tracks } from './data/tracks';
 import { RaceAudio } from './game/audio';
 import { applyCampaignResults, campaignLeader, createCampaignScores, type CampaignScore } from './game/campaign';
+import { createFormulaAssetManager } from './game/formulaAssets';
 import { animateDriverIdle } from './game/models';
 import { createRace, createResults, type RaceControl, type RaceSnapshot } from './game/race';
 import { createReplayRecorder, findReplayFrame, type RaceReplay, type ReplayRecorder } from './game/replay';
@@ -185,6 +186,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 900);
 const clock = new THREE.Clock();
 const audio = new RaceAudio(settings);
+const formulaAssets = createFormulaAssetManager();
 
 const playerNameInput = root.querySelector<HTMLInputElement>('#playerName')!;
 const trackSelect = root.querySelector<HTMLSelectElement>('#trackSelect')!;
@@ -199,6 +201,9 @@ const leaderboard = root.querySelector<HTMLElement>('#leaderboard')!;
 const debug = root.querySelector<HTMLElement>('#debug')!;
 
 initUi();
+void formulaAssets.warmup().then(() => {
+  if (gameState === 'menu' || gameState === 'setup') loadMenuScene();
+});
 loadMenuScene();
 showCaption('Arthur Bell', fill(dialogue.title[0][1]));
 
@@ -402,8 +407,9 @@ function startPreRace(): void {
   showScreen(null);
   hud.classList.remove('active');
   controls.classList.remove('active');
-  sceneBuild = buildRaceScene(scene, selectedTrack, buildRacers());
-  race = createRace(mode, selectedTrack, buildRacers(), settings);
+  const racers = buildRacers();
+  sceneBuild = buildRaceScene(scene, selectedTrack, racers, createSceneCar);
+  race = createRace(mode, selectedTrack, racers, settings);
   replayRecorder = createReplayRecorder(selectedTrack.id, selectedTrack.name, settings.playerName);
   latestSnapshot = race.snapshot();
   replayRecorder.record(0, latestSnapshot);
@@ -461,7 +467,7 @@ function loadMenuScene(): void {
   menuPreviewTrack = selectedTrack;
   menuFlyoverIndex = tracks.findIndex((track) => track.id === selectedTrack.id);
   menuFlyoverTimer = 7;
-  sceneBuild = buildRaceScene(scene, menuPreviewTrack, buildRacers());
+  sceneBuild = buildRaceScene(scene, menuPreviewTrack, buildRacers(), createSceneCar);
   race = null;
   latestSnapshot = null;
   hud.classList.remove('active');
@@ -476,7 +482,7 @@ function updateMenuCamera(dt: number, cycleTracks: boolean): void {
     if (menuFlyoverTimer <= 0) {
       menuFlyoverIndex = (menuFlyoverIndex + 1) % tracks.length;
       menuPreviewTrack = tracks[menuFlyoverIndex];
-      sceneBuild = buildRaceScene(scene, menuPreviewTrack, buildRacers());
+      sceneBuild = buildRaceScene(scene, menuPreviewTrack, buildRacers(), createSceneCar);
       menuFlyoverTimer = 7;
       showCaption('Arthur Bell', `Track preview: ${menuPreviewTrack.name}.`);
     }
@@ -628,7 +634,7 @@ function startReplayPlayback(): void {
   }
   const track = tracks.find((item) => item.id === lastReplay?.trackId) ?? selectedTrack;
   selectedTrack = track;
-  sceneBuild = buildRaceScene(scene, track, buildRacers());
+  sceneBuild = buildRaceScene(scene, track, buildRacers(), createSceneCar);
   replayElapsed = 0;
   gameState = 'replay';
   showScreen(null);
@@ -753,6 +759,7 @@ function exposeDebug(): void {
     campaignLeader: campaignLeader(campaignScores)?.name ?? null,
     audio: audio.metrics(),
     assetKit: formulaAssetManifest,
+    assetStatus: formulaAssets.metrics(),
   };
   debug.textContent = `calls ${metrics.calls}\ntris ${metrics.triangles}\ngeos ${metrics.geometries}\ntex ${metrics.textures}\nfps ${metrics.estimatedFps}\nreplay ${metrics.replayFrames}`;
   debug.classList.toggle('active', settings.performanceMode === 'highDetail');
@@ -797,6 +804,10 @@ function resetFrameStats(): void {
 
 function fill(text: string): string {
   return text.replaceAll('{player}', settings.playerName).replaceAll('{track}', selectedTrack.name);
+}
+
+function createSceneCar(racer: RacerDefinition): THREE.Group {
+  return formulaAssets.createCar(racer.color, racer.helmet, settings.performanceMode === 'highDetail' && racer.id === playerTemplate.id);
 }
 
 function formatTime(value: number): string {
