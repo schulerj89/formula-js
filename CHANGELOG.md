@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.17.0 - 2026-06-26
+
+- Added scene lifecycle metrics for race scene rebuild counts and active car counts.
+- Added a mobile repeat-race performance smoke that runs menu -> race -> podium -> menu -> race.
+- Added regression gates for repeated mobile render calls, triangles, geometries, textures, materials, replay bytes, and heap growth when Chromium exposes heap counters.
+- Included the repeat-race smoke in the browser verification script.
+
 ## 1.16.0 - 2026-06-26
 
 - Added a mobile in-race `POS` button that opens the leaderboard on demand without default HUD clutter.

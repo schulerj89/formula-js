@@ -1,6 +1,6 @@
 {
   "name": "formula-js",
-  "version": "1.16.0",
+  "version": "1.17.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run tests/race.test.ts",
-    "screenshot": "playwright test tests/screenshot.spec.ts tests/asset-inspector.spec.ts tests/campaign-flow.spec.ts",
+    "screenshot": "playwright test tests/screenshot.spec.ts tests/asset-inspector.spec.ts tests/campaign-flow.spec.ts tests/performance-cycle.spec.ts",
     "audio:plan": "node scripts/generate-elevenlabs-assets.mjs",
     "audio:generate": "node scripts/generate-elevenlabs-assets.mjs --generate",
     "audio:generate:partial": "node scripts/generate-elevenlabs-assets.mjs --generate --allow-partial",

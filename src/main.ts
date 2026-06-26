@@ -110,6 +110,7 @@ let lastDamageScale = '';
 let lastTireScale = '';
 let lastLeaderboardHtml = '';
 let leaderboardExpanded = false;
+let sceneBuildCount = 0;
 const frameTimes: number[] = [];
 let frameTimeWindow = 0;
 const roadParkingBase = 17;
@@ -497,6 +498,7 @@ function startPreRace(): void {
   settings.playerName = playerNameInput.value.trim() || 'Rookie';
   saveSettings();
   gameState = 'prerace';
+  lastReplay = null;
   lightsOn = 0;
   lastLightBeep = 0;
   lastContactRadioEvent = 0;
@@ -520,7 +522,7 @@ function startPreRace(): void {
   hud.classList.remove('active');
   controls.classList.remove('active');
   const racers = buildRacers();
-  sceneBuild = buildRaceScene(scene, selectedTrack, racers, createSceneCar, sceneDetailLevel());
+  sceneBuild = buildTrackedRaceScene(selectedTrack, racers);
   renderTrackMapRoute();
   race = createRace(mode, selectedTrack, racers, settings);
   replayRecorder = createReplayRecorder(selectedTrack.id, selectedTrack.name, settings.playerName);
@@ -585,6 +587,12 @@ function buildRacers(): RacerDefinition[] {
   return [{ ...playerTemplate, name: settings.playerName, color: bodyPaint.value, helmet: helmetPaint.value }, ...cpuRacers];
 }
 
+function buildTrackedRaceScene(track: TrackDefinition, racers: RacerDefinition[]): SceneBuild {
+  sceneBuildCount += 1;
+  invalidateDebugMetrics();
+  return buildRaceScene(scene, track, racers, createSceneCar, sceneDetailLevel());
+}
+
 function loadMenuScene(): void {
   podiumGroup = null;
   podiumStats = null;
@@ -593,7 +601,7 @@ function loadMenuScene(): void {
   menuPreviewTrack = selectedTrack;
   menuFlyoverIndex = tracks.findIndex((track) => track.id === selectedTrack.id);
   menuFlyoverTimer = 7;
-  sceneBuild = buildRaceScene(scene, menuPreviewTrack, buildRacers(), createSceneCar, sceneDetailLevel());
+  sceneBuild = buildTrackedRaceScene(menuPreviewTrack, buildRacers());
   clearTrackMap();
   race = null;
   latestSnapshot = null;
@@ -609,7 +617,7 @@ function updateMenuCamera(dt: number, cycleTracks: boolean): void {
     if (menuFlyoverTimer <= 0) {
       menuFlyoverIndex = (menuFlyoverIndex + 1) % tracks.length;
       menuPreviewTrack = tracks[menuFlyoverIndex];
-      sceneBuild = buildRaceScene(scene, menuPreviewTrack, buildRacers(), createSceneCar, sceneDetailLevel());
+      sceneBuild = buildTrackedRaceScene(menuPreviewTrack, buildRacers());
       menuFlyoverTimer = 7;
       showCaption('Arthur Bell', `Track preview: ${menuPreviewTrack.name}.`);
     }
@@ -967,7 +975,7 @@ function showCampaignFinale(): void {
 
 function forcePodiumForSmoke(finaleMode = false): void {
   const racers = buildRacers();
-  if (!sceneBuild) sceneBuild = buildRaceScene(scene, selectedTrack, racers, createSceneCar, sceneDetailLevel());
+  if (!sceneBuild) sceneBuild = buildTrackedRaceScene(selectedTrack, racers);
   results = racers.slice(0, 3).map((racer, index) => ({
     racerId: racer.id,
     name: racer.name,
@@ -1178,7 +1186,7 @@ function startReplayPlayback(): void {
   }
   const track = tracks.find((item) => item.id === lastReplay?.trackId) ?? selectedTrack;
   selectedTrack = track;
-  sceneBuild = buildRaceScene(scene, track, buildRacers(), createSceneCar, sceneDetailLevel());
+  sceneBuild = buildTrackedRaceScene(track, buildRacers());
   replayElapsed = 0;
   replayWrappedElapsed = 0;
   replayEventIndex = 0;
@@ -1362,6 +1370,7 @@ function buildDebugMetrics() {
     lines: renderer.info.render.lines,
     geometries: renderer.info.memory.geometries,
     textures: renderer.info.memory.textures,
+    materials: countSceneMaterials(),
     p50FrameMs: Math.round(p50 * 1000 * 10) / 10,
     p95FrameMs: Math.round(p95 * 1000 * 10) / 10,
     worstFrameMs: Math.round(worst * 1000 * 10) / 10,
@@ -1369,6 +1378,11 @@ function buildDebugMetrics() {
     pixelRatio: renderer.getPixelRatio(),
     viewport: { width: window.innerWidth, height: window.innerHeight },
     performanceMode: settings.performanceMode,
+    sceneLifecycle: {
+      builds: sceneBuildCount,
+      cars: sceneBuild?.cars.size ?? 0,
+      hasScene: Boolean(sceneBuild),
+    },
     performanceWork: {
       hudDomWrites,
       leaderboardRenders: leaderboardRenderCount,
@@ -1474,6 +1488,16 @@ function buildDebugMetrics() {
     assetKit: formulaAssetManifest,
     assetStatus: formulaAssets.metrics(),
   };
+}
+
+function countSceneMaterials(): number {
+  const materials = new Set<THREE.Material>();
+  scene.traverse((object) => {
+    const material = (object as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+    if (Array.isArray(material)) material.forEach((entry) => materials.add(entry));
+    else if (material) materials.add(material);
+  });
+  return materials.size;
 }
 
 function debugOverlayEnabled(): boolean {
