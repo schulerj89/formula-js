@@ -13,6 +13,18 @@ test('clicks through campaign podiums into the finale', async ({ page }, testInf
 
   for (let index = 0; index < 4; index += 1) {
     await expect(page.locator('#startLights')).toBeVisible();
+    await expect(page.locator('#campaignObjective')).toBeVisible();
+    await expect(page.locator('#campaignObjective')).toContainText(/Finish P[123] or better/);
+    const preraceMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
+    expect(preraceMetrics.campaign.objective).toMatchObject({
+      raceNumber: index + 1,
+      totalRaces: 4,
+      visible: true,
+    });
+    expect(preraceMetrics.preRaceCommentary.lineIds).toContain(`arthur.prerace.${preraceMetrics.campaign.objective.trackId}.objective`);
+    if (index === 0) {
+      await page.screenshot({ path: testInfo.outputPath('campaign-objective-start.png'), fullPage: true });
+    }
     await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'race');
     await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.debug?.forceRaceFinish?.());
     await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'podium');
@@ -23,6 +35,10 @@ test('clicks through campaign podiums into the finale', async ({ page }, testInf
     expect(podiumMetrics.campaign.trackIndex).toBe(index);
     expect(podiumMetrics.campaign.scores[0].racerId).toBe('player');
     expect(podiumMetrics.campaign.scores[0].points).toBe((index + 1) * 25);
+    expect(podiumMetrics.campaign.objectiveOutcome).toMatchObject({
+      achieved: true,
+      playerPosition: 1,
+    });
     expect(podiumMetrics.podium.topThreeRacerIds[0]).toBe('player');
     expect(podiumMetrics.podium.stats.finaleMode).toBe(false);
     await expect(page.getByRole('button', { name: index < 3 ? 'Next Race' : 'Finale' })).toBeVisible();

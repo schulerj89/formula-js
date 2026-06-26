@@ -656,6 +656,49 @@ p {
   display: flex;
 }
 
+.campaign-objective {
+  position: absolute;
+  left: max(14px, env(safe-area-inset-left));
+  top: calc(max(18px, env(safe-area-inset-top)) + 64px);
+  display: grid;
+  width: min(360px, calc(100vw - 28px));
+  gap: 3px;
+  padding: 10px 12px;
+  color: #f7fbff;
+  background: rgb(6 10 16 / 76%);
+  border: 1px solid rgb(247 201 72 / 36%);
+  border-radius: 8px;
+  pointer-events: none;
+  text-shadow: 0 2px 10px rgb(0 0 0 / 45%);
+}
+
+.campaign-objective[hidden] {
+  display: none;
+}
+
+.campaign-objective span,
+.campaign-objective small {
+  overflow: hidden;
+  color: #dff7ff;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.campaign-objective strong {
+  overflow: hidden;
+  color: #f7c948;
+  font-size: 0.86rem;
+  line-height: 1.18;
+  letter-spacing: 0px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .start-light {
   width: 24px;
   height: 24px;
@@ -864,6 +907,15 @@ p {
   .text-link {
     min-height: 28px;
     font-size: 0.64rem;
+  }
+
+  .campaign-objective {
+    top: calc(max(14px, env(safe-area-inset-top)) + 58px);
+    width: min(330px, calc(100vw - 28px));
+  }
+
+  .campaign-objective strong {
+    font-size: 0.76rem;
   }
 
   .setup-panel {

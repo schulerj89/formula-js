@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.33.0 - 2026-06-26
+
+- Added campaign race objectives with deterministic target positions and rival-to-beat pressure for each race.
+- Surfaced the current campaign objective in the pre-race lights flow, debug metrics, and campaign browser smoke artifact.
+- Added podium objective outcome commentary and metrics so completed/missed campaign targets are reported after each race.
+- Clarified `AGENTS.md` so uncertain domain or product decisions require an expert/subagent and a recorded decision.
+
 ## 1.32.1 - 2026-06-26
 
 - Made the campaign finale winner celebration a distinct overhead-arm champion dance instead of a louder copy of the normal podium motion.

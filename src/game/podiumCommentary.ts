@@ -1,7 +1,7 @@
-import type { CampaignScore } from './campaign';
+import type { CampaignObjectiveOutcome, CampaignScore } from './campaign';
 import type { RaceResult } from '../types';
 
-export type PodiumCommentaryKind = 'race-winner' | 'player-result' | 'campaign-standings' | 'finale-champion' | 'finale-top-three';
+export type PodiumCommentaryKind = 'race-winner' | 'player-result' | 'campaign-objective' | 'campaign-standings' | 'finale-champion' | 'finale-top-three';
 
 export interface PodiumCommentaryEvent {
   kind: PodiumCommentaryKind;
@@ -15,6 +15,7 @@ export function createRacePodiumCommentary(
   results: RaceResult[],
   playerName: string,
   campaignScores: CampaignScore[] = [],
+  objectiveOutcome?: CampaignObjectiveOutcome | null,
 ): PodiumCommentaryEvent[] {
   const [winner, second, third] = results;
   const playerIndex = results.findIndex((result) => result.name === playerName);
@@ -41,6 +42,17 @@ export function createRacePodiumCommentary(
             ? `${playerName} is on the podium in P${position}. Sensible champagne, reckless grin.`
             : `${playerName} finishes P${position}. Not the balcony, but plenty for the engineers to chew on.`,
       focusRacerId: results[playerIndex].racerId,
+    });
+  }
+  if (objectiveOutcome) {
+    events.push({
+      kind: 'campaign-objective',
+      lineId: objectiveOutcome.achieved ? 'mags.podium.objective-complete' : 'arthur.podium.objective-missed',
+      speaker: objectiveOutcome.achieved ? 'Mags Whitlow' : 'Arthur Bell',
+      text: objectiveOutcome.achieved
+        ? `${objectiveOutcome.summary} Campaign pressure handled, for now.`
+        : `${objectiveOutcome.summary} The championship has made its notes.`,
+      focusRacerId: 'player',
     });
   }
   const standingsLine = createStandingsLine(campaignScores);

@@ -7,7 +7,16 @@ import { dialogue } from './data/dialogue';
 import { cpuRacers, playerTemplate } from './data/racers';
 import { tracks } from './data/tracks';
 import { RaceAudio } from './game/audio';
-import { applyCampaignResults, campaignLeader, createCampaignScores, type CampaignScore } from './game/campaign';
+import {
+  applyCampaignResults,
+  campaignLeader,
+  createCampaignObjective,
+  createCampaignScores,
+  evaluateCampaignObjective,
+  type CampaignObjective,
+  type CampaignObjectiveOutcome,
+  type CampaignScore,
+} from './game/campaign';
 import { createFormulaAssetManager } from './game/formulaAssets';
 import { animateDriverIdle, summarizeDriverRig } from './game/models';
 import { createFinaleCommentary, createRacePodiumCommentary, type PodiumCommentaryEvent, type PodiumCommentaryKind } from './game/podiumCommentary';
@@ -69,6 +78,8 @@ let lastRaceCommentaryFocusRacerId: string | null = null;
 let preRaceCommentaryTrackId: string | null = null;
 let preRaceCommentaryLineIds: string[] = [];
 let campaignTrackIndex = 0;
+let currentCampaignObjective: CampaignObjective | null = null;
+let lastCampaignObjectiveOutcome: CampaignObjectiveOutcome | null = null;
 let uiBound = false;
 let replayRecorder: ReplayRecorder | null = null;
 let lastReplay: RaceReplay | null = null;
@@ -267,6 +278,12 @@ root.innerHTML = `
       <div class="start-light" data-light="5"></div>
     </div>
 
+    <div class="campaign-objective" id="campaignObjective" hidden>
+      <span>Campaign Objective</span>
+      <strong id="campaignObjectiveText"></strong>
+      <small id="campaignObjectiveMeta"></small>
+    </div>
+
     <div class="controls" id="controls">
       <div class="control-cluster"><button class="steer" data-control="left" aria-label="Steer left">&lt;</button><button class="steer" data-control="right" aria-label="Steer right">&gt;</button></div>
       <button class="pedal brake" data-control="brake">Brake</button>
@@ -300,6 +317,9 @@ const bodyPaintSwatches = root.querySelector<HTMLDivElement>('#bodyPaintSwatches
 const helmetPaintSwatches = root.querySelector<HTMLDivElement>('#helmetPaintSwatches')!;
 const caption = root.querySelector<HTMLDivElement>('#caption')!;
 const startLights = root.querySelector<HTMLDivElement>('#startLights')!;
+const campaignObjective = root.querySelector<HTMLDivElement>('#campaignObjective')!;
+const campaignObjectiveText = root.querySelector<HTMLElement>('#campaignObjectiveText')!;
+const campaignObjectiveMeta = root.querySelector<HTMLElement>('#campaignObjectiveMeta')!;
 const controls = root.querySelector<HTMLDivElement>('#controls')!;
 const goPedal = root.querySelector<HTMLButtonElement>('[data-control="go"]')!;
 const brakePedal = root.querySelector<HTMLButtonElement>('[data-control="brake"]')!;
@@ -539,6 +559,12 @@ function startPreRace(): void {
   invalidateDebugMetrics();
   settings.playerName = playerNameInput.value.trim() || 'Rookie';
   saveSettings();
+  const racers = buildRacers();
+  if (mode === 'campaign' && campaignTrackIndex === 0) campaignScores = createCampaignScores(racers);
+  currentCampaignObjective =
+    mode === 'campaign' ? createCampaignObjective(campaignScores.length ? campaignScores : createCampaignScores(racers), racers, campaignTrackIndex, tracks.length, selectedTrack) : null;
+  lastCampaignObjectiveOutcome = null;
+  renderCampaignObjective();
   gameState = 'prerace';
   lastReplay = null;
   lightsOn = 0;
@@ -559,7 +585,7 @@ function startPreRace(): void {
   lastRaceCommentaryPriority = null;
   lastRaceCommentarySpeaker = null;
   lastRaceCommentaryFocusRacerId = null;
-  const preRaceCommentary = createPreRaceCommentary(selectedTrack, settings.playerName);
+  const preRaceCommentary = createPreRaceCommentary(selectedTrack, settings.playerName, currentCampaignObjective);
   preRaceCommentaryTrackId = selectedTrack.id;
   preRaceCommentaryLineIds = preRaceCommentary.map((line) => line.lineId);
   updateStartLights();
@@ -567,7 +593,6 @@ function startPreRace(): void {
   showScreen(null);
   hud.classList.remove('active');
   controls.classList.remove('active');
-  const racers = buildRacers();
   sceneBuild = buildTrackedRaceScene(selectedTrack, racers);
   renderTrackMapRoute();
   race = createRace(mode, selectedTrack, racers, settings);
@@ -585,6 +610,7 @@ function startRace(): void {
   leaderboardExpanded = settings.leaderboard && !isMobileViewport();
   lightsOn = 0;
   startLights.classList.remove('active');
+  campaignObjective.hidden = true;
   resetFrameStats();
   audio.stopMusic();
   hud.classList.add('active');
@@ -614,6 +640,8 @@ function finishRace(snapshot: RaceSnapshot): void {
   results = createResults(snapshot);
   lastReplay = replayRecorder?.finalize(results) ?? lastReplay;
   replayRecorder = null;
+  lastCampaignObjectiveOutcome = mode === 'campaign' && currentCampaignObjective ? evaluateCampaignObjective(currentCampaignObjective, results) : null;
+  campaignObjective.hidden = true;
   if (mode === 'campaign') {
     campaignScores = applyCampaignResults(campaignScores.length ? campaignScores : createCampaignScores(buildRacers()), results);
   }
@@ -624,8 +652,18 @@ function finishRace(snapshot: RaceSnapshot): void {
   hud.classList.remove('active');
   showScreen('podium');
   renderPodium();
-  startPodiumCommentary(createRacePodiumCommentary(results, settings.playerName, campaignScores));
+  startPodiumCommentary(createRacePodiumCommentary(results, settings.playerName, campaignScores, lastCampaignObjectiveOutcome));
   invalidateDebugMetrics();
+}
+
+function renderCampaignObjective(): void {
+  if (!currentCampaignObjective || gameState === 'race') {
+    campaignObjective.hidden = true;
+    return;
+  }
+  campaignObjective.hidden = false;
+  campaignObjectiveText.textContent = currentCampaignObjective.summary;
+  campaignObjectiveMeta.textContent = `Race ${currentCampaignObjective.raceNumber}/${currentCampaignObjective.totalRaces} / ${currentCampaignObjective.trackName}`;
 }
 
 function buildRacers(): RacerDefinition[] {
@@ -645,6 +683,8 @@ function loadMenuScene(): void {
   podiumStats = null;
   podiumFocusId = null;
   clearPodiumCommentary();
+  currentCampaignObjective = null;
+  campaignObjective.hidden = true;
   menuPreviewTrack = selectedTrack;
   menuFlyoverIndex = tracks.findIndex((track) => track.id === selectedTrack.id);
   menuFlyoverTimer = 7;
@@ -1674,6 +1714,26 @@ function buildDebugMetrics() {
       trackIndex: campaignTrackIndex,
       trackCount: tracks.length,
       scores: campaignScores,
+      objective: currentCampaignObjective
+        ? {
+            raceNumber: currentCampaignObjective.raceNumber,
+            totalRaces: currentCampaignObjective.totalRaces,
+            trackId: currentCampaignObjective.trackId,
+            targetPosition: currentCampaignObjective.targetPosition,
+            rivalRacerId: currentCampaignObjective.rivalRacerId,
+            rivalName: currentCampaignObjective.rivalName,
+            summary: currentCampaignObjective.summary,
+            visible: !campaignObjective.hidden,
+          }
+        : null,
+      objectiveOutcome: lastCampaignObjectiveOutcome
+        ? {
+            achieved: lastCampaignObjectiveOutcome.achieved,
+            playerPosition: lastCampaignObjectiveOutcome.playerPosition,
+            rivalPosition: lastCampaignObjectiveOutcome.rivalPosition,
+            summary: lastCampaignObjectiveOutcome.summary,
+          }
+        : null,
       nextAction:
         mode === 'campaign' && gameState === 'podium'
           ? campaignTrackIndex < tracks.length - 1

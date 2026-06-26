@@ -12,7 +12,7 @@ import elevenLabsManifest from '../public/audio/elevenlabs/manifest.json';
 import { analyzeCarContact, analyzeCpuRacecraft, analyzePlayerHandling, createRace, type RacerState } from '../src/game/race';
 import { createPositionCommentary, createSpotterCommentary, pickActiveRaceEvent } from '../src/game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability } from '../src/game/raceReadability';
-import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
+import { applyCampaignResults, createCampaignObjective, createCampaignScores, evaluateCampaignObjective } from '../src/game/campaign';
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
 import { buildRaceScene, createPodiumCeremony, type SceneDetailLevel } from '../src/game/scene';
 import { TrackPath } from '../src/game/trackPath';
@@ -182,6 +182,24 @@ describe('audio data', () => {
       }
     }
     expect(seenTexts.size).toBe(tracks.length * 2);
+  });
+
+  it('adds a campaign objective pre-race line only when campaign context is present', () => {
+    const objective = createCampaignObjective(createCampaignScores([{ ...playerTemplate, name: settings.playerName }, ...cpuRacers]), [
+      { ...playerTemplate, name: settings.playerName },
+      ...cpuRacers,
+    ], 0, tracks.length, tracks[0]);
+
+    const lines = createPreRaceCommentary(tracks[0], 'Juno Vale', objective);
+
+    expect(lines).toHaveLength(3);
+    expect(lines.map((line) => line.lineId)).toEqual([
+      'arthur.prerace.silverpine.track',
+      'mags.prerace.silverpine.rivals',
+      'arthur.prerace.silverpine.objective',
+    ]);
+    expect(lines[2].speaker).toBe('Arthur Bell');
+    expect(lines[2].text).toContain('Campaign target: Finish P3 or better');
   });
 
   it('defines four non-race music themes with distinct titles and tempos', () => {
@@ -1128,6 +1146,35 @@ describe('campaign scoring', () => {
     expect(scores[0].wins).toBe(4);
     expect(scores[0].podiums).toBe(4);
   });
+
+  it('creates deterministic campaign objectives and evaluates rival pressure', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const scores = createCampaignScores(racers);
+    const openingObjective = createCampaignObjective(scores, racers, 0, tracks.length, tracks[0]);
+
+    expect(openingObjective).toMatchObject({
+      raceIndex: 0,
+      raceNumber: 1,
+      totalRaces: tracks.length,
+      trackId: tracks[0].id,
+      targetPosition: 3,
+      rivalRacerId: cpuRacers[0].id,
+    });
+    expect(openingObjective.summary).toContain('Finish P3 or better');
+
+    const results = [
+      { racerId: 'cpu-2', name: 'Maya Cross', totalTime: 82, bestLap: 26, damage: 1, tires: 1 },
+      { racerId: 'player', name: settings.playerName, totalTime: 83, bestLap: 26.2, damage: 1, tires: 1 },
+      { racerId: 'cpu-1', name: 'Luca Venn', totalTime: 84, bestLap: 26.4, damage: 1, tires: 1 },
+    ];
+
+    const outcome = evaluateCampaignObjective(openingObjective, results);
+
+    expect(outcome.achieved).toBe(true);
+    expect(outcome.playerPosition).toBe(2);
+    expect(outcome.rivalPosition).toBe(3);
+    expect(outcome.summary).toContain('Objective complete');
+  });
 });
 
 describe('podium commentary', () => {
@@ -1150,6 +1197,30 @@ describe('podium commentary', () => {
     expect(events[1].lineId).toBe('mags.podium.player-win');
     expect(events[1].focusRacerId).toBe('player');
     expect(events[2].text).toContain('leads Luca Venn by 7 points');
+  });
+
+  it('adds campaign objective outcome before standings when present', () => {
+    const results = [
+      { racerId: 'player', name: 'Test Driver', totalTime: 82, bestLap: 26, damage: 0.9, tires: 0.8 },
+      { racerId: 'cpu-1', name: 'Luca Venn', totalTime: 84, bestLap: 27, damage: 0.9, tires: 0.8 },
+      { racerId: 'cpu-2', name: 'Maya Cross', totalTime: 85, bestLap: 27.4, damage: 0.9, tires: 0.8 },
+    ];
+    const scores = [
+      { racerId: 'player', name: 'Test Driver', points: 43, wins: 1, podiums: 2, lastFinish: 1 },
+      { racerId: 'cpu-1', name: 'Luca Venn', points: 36, wins: 1, podiums: 2, lastFinish: 2 },
+    ];
+    const objective = createCampaignObjective(scores, [{ id: 'player', name: 'Test Driver' }, ...cpuRacers], 1, tracks.length, tracks[1]);
+    const outcome = evaluateCampaignObjective(objective, results);
+
+    const events = createRacePodiumCommentary(results, settings.playerName, scores, outcome);
+
+    expect(events.map((event) => event.kind)).toEqual(['race-winner', 'player-result', 'campaign-objective', 'campaign-standings']);
+    expect(events[2]).toMatchObject({
+      lineId: 'mags.podium.objective-complete',
+      speaker: 'Mags Whitlow',
+      focusRacerId: 'player',
+    });
+    expect(events[2].text).toContain('Objective complete');
   });
 
   it('summarizes campaign finale champion and top three', () => {
