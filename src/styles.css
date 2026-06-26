@@ -264,7 +264,7 @@ p {
   position: absolute;
   inset: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) auto max(12px, env(safe-area-inset-left));
   display: none;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(112px, 184px);
   gap: 10px;
   align-items: start;
   pointer-events: none;
@@ -275,6 +275,7 @@ p {
 }
 
 .hud-main {
+  grid-row: 1 / span 2;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -329,9 +330,70 @@ p {
   background: #ff6b6b;
 }
 
+.race-readout {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.track-map {
+  width: min(30vw, 128px);
+  min-width: 104px;
+  aspect-ratio: 1;
+  padding: 7px;
+  background: rgb(6 10 16 / 74%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+}
+
+#trackMapRoute {
+  fill: none;
+  stroke: rgb(235 244 255 / 78%);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.track-dot {
+  fill: #f7c948;
+  stroke: rgb(6 10 16 / 82%);
+  stroke-width: 1.5;
+}
+
+.track-dot.player {
+  fill: #45d483;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.gap-strip {
+  display: grid;
+  width: min(30vw, 128px);
+  min-width: 104px;
+  gap: 4px;
+  color: #f7fbff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.gap-strip span {
+  overflow: hidden;
+  padding: 4px 6px;
+  background: rgb(6 10 16 / 74%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .leaderboard {
+  grid-column: 2;
   display: none;
-  min-width: 184px;
+  width: min(34vw, 184px);
+  min-width: 112px;
+  max-height: 172px;
+  overflow: hidden;
   padding: 10px;
   background: rgb(6 10 16 / 76%);
   border: 1px solid rgb(255 255 255 / 12%);
@@ -344,8 +406,8 @@ p {
 
 .leaderboard ol {
   margin: 0;
-  padding-left: 24px;
-  font-size: 0.8rem;
+  padding-left: 20px;
+  font-size: 0.72rem;
 }
 
 .standings {
@@ -503,5 +565,9 @@ p {
 
   .caption {
     bottom: 26px;
+  }
+
+  .leaderboard ol {
+    font-size: 0.8rem;
   }
 }

@@ -26,10 +26,18 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await page.screenshot({ path: testInfo.outputPath('start-lights.png'), fullPage: true });
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'race');
   await expect(page.locator('#startLights')).toBeHidden();
-  await page.waitForTimeout(1500);
+  await expect(page.locator('#raceReadout')).toBeVisible();
+  await page.keyboard.down('Space');
+  await page.waitForTimeout(8000);
+  await page.keyboard.up('Space');
+  await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'race');
+  await expect(page.locator('#lap')).toHaveText('1/1');
   await page.screenshot({ path: testInfo.outputPath('race-start.png'), fullPage: true });
 
   const metrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
+  expect(metrics.state).toBe('race');
+  expect(metrics.liveReplayFrames).toBeGreaterThan(20);
+  expect(metrics.replayFrames).toBe(0);
   expect(metrics.triangles).toBeGreaterThan(30_000);
   expect(metrics.triangles).toBeLessThan(900_000);
   expect(metrics.calls).toBeLessThan(320);
@@ -49,6 +57,10 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.audio.assets.missingAssets).toBeGreaterThanOrEqual(0);
   expect(metrics.audio.assets.fallbackMusicEvents).toBeGreaterThanOrEqual(0);
   expect(metrics.audio.assets.assetErrors).toBeGreaterThanOrEqual(0);
+  expect(metrics.raceReadability.trackMapActive).toBe(true);
+  expect(metrics.raceReadability.trackMapDots).toBe(8);
+  expect(metrics.raceReadability.nearestAheadMeters ?? 0).toBeGreaterThanOrEqual(0);
+  expect(metrics.raceReadability.nearestBehindMeters ?? 0).toBeGreaterThanOrEqual(0);
   expect(metrics.sceneDetails.barrierPanels).toBe(320);
   expect(metrics.sceneDetails.sponsorBoards).toBe(72);
   expect(metrics.sceneDetails.tireStacks).toBeGreaterThan(40);

@@ -11,6 +11,7 @@ import { applyCampaignResults, campaignLeader, createCampaignScores, type Campai
 import { createFormulaAssetManager } from './game/formulaAssets';
 import { animateDriverIdle } from './game/models';
 import { createRace, createResults, type RaceControl, type RaceSnapshot } from './game/race';
+import { createTrackMapLayout, summarizeRaceReadability, type TrackMapLayout } from './game/raceReadability';
 import { createReplayRecorder, findReplayFrame, type RaceReplay, type ReplayRecorder } from './game/replay';
 import { buildRaceScene, createPodiumCeremony, type PodiumCeremonyStats, type SceneBuild } from './game/scene';
 import type { GameMode, GameSettings, GameState, RacerDefinition, RaceResult, TrackDefinition } from './types';
@@ -62,6 +63,10 @@ let podiumParkedCarCount = 0;
 let menuFlyoverIndex = 0;
 let menuFlyoverTimer = 0;
 let menuPreviewTrack = selectedTrack;
+let trackMapLayout: TrackMapLayout | null = null;
+let trackMapDotCount = 0;
+let nearestAheadMeters: number | null = null;
+let nearestBehindMeters: number | null = null;
 const frameTimes: number[] = [];
 let frameTimeWindow = 0;
 const roadParkingBase = 17;
@@ -164,6 +169,16 @@ root.innerHTML = `
           <div class="bar"><span id="tireBar"></span></div>
         </div>
       </div>
+      <div class="race-readout" id="raceReadout" aria-label="Race position map">
+        <svg class="track-map" viewBox="0 0 128 128" role="img" aria-label="Track map">
+          <polyline id="trackMapRoute" points="" />
+          <g id="trackMapDots"></g>
+        </svg>
+        <div class="gap-strip">
+          <span id="gapAhead">Up --</span>
+          <span id="gapBehind">Back --</span>
+        </div>
+      </div>
       <aside class="leaderboard" id="leaderboard"><ol></ol></aside>
     </div>
 
@@ -210,6 +225,11 @@ const controls = root.querySelector<HTMLDivElement>('#controls')!;
 const hud = root.querySelector<HTMLDivElement>('.hud')!;
 const leaderboard = root.querySelector<HTMLElement>('#leaderboard')!;
 const debug = root.querySelector<HTMLElement>('#debug')!;
+const trackMapRoute = root.querySelector<SVGPolylineElement>('#trackMapRoute')!;
+const trackMapDots = root.querySelector<SVGGElement>('#trackMapDots')!;
+const gapAhead = root.querySelector<HTMLElement>('#gapAhead')!;
+const gapBehind = root.querySelector<HTMLElement>('#gapBehind')!;
+const trackMapDotElements = new Map<string, SVGCircleElement>();
 
 initUi();
 void formulaAssets.warmup().then(() => {
@@ -420,6 +440,7 @@ function startPreRace(): void {
   controls.classList.remove('active');
   const racers = buildRacers();
   sceneBuild = buildRaceScene(scene, selectedTrack, racers, createSceneCar);
+  renderTrackMapRoute();
   race = createRace(mode, selectedTrack, racers, settings);
   replayRecorder = createReplayRecorder(selectedTrack.id, selectedTrack.name, settings.playerName);
   latestSnapshot = race.snapshot();
@@ -483,6 +504,7 @@ function loadMenuScene(): void {
   menuFlyoverIndex = tracks.findIndex((track) => track.id === selectedTrack.id);
   menuFlyoverTimer = 7;
   sceneBuild = buildRaceScene(scene, menuPreviewTrack, buildRacers(), createSceneCar);
+  clearTrackMap();
   race = null;
   latestSnapshot = null;
   hud.classList.remove('active');
@@ -553,14 +575,73 @@ function updateCars(snapshot: RaceSnapshot): void {
 }
 
 function updateHud(snapshot: RaceSnapshot): void {
+  const totalLaps = mode === 'timeAttack' ? 1 : selectedTrack.laps;
+  const visibleLap = snapshot.player.finished ? totalLaps : Math.min(totalLaps, snapshot.player.lap + 1);
   root.querySelector('#place')!.textContent = `${snapshot.position}/8`;
-  root.querySelector('#lap')!.textContent = `${Math.min(selectedTrack.laps, snapshot.player.lap + 1)}/${mode === 'timeAttack' ? 1 : selectedTrack.laps}`;
+  root.querySelector('#lap')!.textContent = `${visibleLap}/${totalLaps}`;
   root.querySelector('#speed')!.textContent = `${Math.round(snapshot.player.speed * 3.6)}`;
   root.querySelector<HTMLElement>('#damageBar')!.style.transform = `scaleX(${snapshot.player.damage})`;
   root.querySelector<HTMLElement>('#tireBar')!.style.transform = `scaleX(${snapshot.player.tires})`;
+  updateTrackMap(snapshot);
   leaderboard.classList.toggle('active', settings.leaderboard);
   const list = leaderboard.querySelector('ol')!;
   list.innerHTML = snapshot.standings.map((racer) => `<li>${racer.definition.shortName} / L${racer.lap + 1}</li>`).join('');
+}
+
+function renderTrackMapRoute(): void {
+  trackMapLayout = createTrackMapLayout(selectedTrack);
+  trackMapRoute.setAttribute('points', trackMapLayout.routePoints);
+  trackMapDotElements.clear();
+  trackMapDots.textContent = '';
+  trackMapDotCount = 0;
+  nearestAheadMeters = null;
+  nearestBehindMeters = null;
+  gapAhead.textContent = 'Up --';
+  gapBehind.textContent = 'Back --';
+}
+
+function clearTrackMap(): void {
+  trackMapLayout = null;
+  trackMapRoute.setAttribute('points', '');
+  trackMapDotElements.clear();
+  trackMapDots.textContent = '';
+  trackMapDotCount = 0;
+  nearestAheadMeters = null;
+  nearestBehindMeters = null;
+}
+
+function updateTrackMap(snapshot: RaceSnapshot): void {
+  if (!sceneBuild || !trackMapLayout) renderTrackMapRoute();
+  if (!sceneBuild || !trackMapLayout) return;
+  const activeIds = new Set<string>();
+  for (const racer of snapshot.racers) {
+    activeIds.add(racer.definition.id);
+    let dot = trackMapDotElements.get(racer.definition.id);
+    if (!dot) {
+      dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.dataset.racerId = racer.definition.id;
+      trackMapDots.append(dot);
+      trackMapDotElements.set(racer.definition.id, dot);
+    }
+    const pose = sceneBuild.path.poseAt(racer.progress, 0);
+    const point = trackMapLayout.project(pose.position.x, pose.position.z);
+    dot.setAttribute('cx', `${point.x}`);
+    dot.setAttribute('cy', `${point.y}`);
+    dot.setAttribute('r', racer.definition.id === 'player' ? '4.8' : '3.2');
+    dot.setAttribute('class', `track-dot ${racer.definition.id === 'player' ? 'player' : ''}`);
+  }
+  for (const [id, dot] of trackMapDotElements) {
+    if (!activeIds.has(id)) {
+      dot.remove();
+      trackMapDotElements.delete(id);
+    }
+  }
+  trackMapDotCount = trackMapDotElements.size;
+  const summary = summarizeRaceReadability(snapshot, selectedTrack.lengthKm);
+  nearestAheadMeters = summary.nearestAhead?.meters ?? null;
+  nearestBehindMeters = summary.nearestBehind?.meters ?? null;
+  gapAhead.textContent = summary.nearestAhead ? `Up ${summary.nearestAhead.shortName} ${formatMeters(summary.nearestAhead.meters)}` : 'Up clear';
+  gapBehind.textContent = summary.nearestBehind ? `Back ${summary.nearestBehind.shortName} ${formatMeters(summary.nearestBehind.meters)}` : 'Back clear';
 }
 
 function updateRadio(snapshot: RaceSnapshot): void {
@@ -877,6 +958,7 @@ function exposeDebug(): void {
     track: selectedTrack.id,
     previewTrack: menuPreviewTrack.id,
     replayFrames: lastReplay?.frames.length ?? 0,
+    liveReplayFrames: replayRecorder?.frameCount() ?? 0,
     replayEvents: lastReplay?.events.length ?? 0,
     replayEventIndex,
     replayFocusRacerId,
@@ -884,6 +966,12 @@ function exposeDebug(): void {
     replayDroppedSamples: lastReplay?.droppedSamples ?? 0,
     replaySampleRate: lastReplay?.sampleRate ?? 0,
     lightsOn,
+    raceReadability: {
+      trackMapActive: Boolean(trackMapLayout),
+      trackMapDots: trackMapDotCount,
+      nearestAheadMeters,
+      nearestBehindMeters,
+    },
     campaignLeader: campaignLeader(campaignScores)?.name ?? null,
     sceneDetails: sceneBuild?.detailStats ?? null,
     podium: {
@@ -955,4 +1043,9 @@ function formatTime(value: number): string {
   const minutes = Math.floor(value / 60);
   const seconds = (value % 60).toFixed(2).padStart(5, '0');
   return `${minutes}:${seconds}`;
+}
+
+function formatMeters(value: number): string {
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}km`;
+  return `${Math.max(1, value)}m`;
 }

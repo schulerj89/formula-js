@@ -7,6 +7,7 @@ import { bodyPaintOptions, helmetPaintOptions } from '../src/data/customization'
 import { elevenLabsSongAssets, elevenLabsVoiceAssets, matchVoiceAsset } from '../src/data/elevenlabs';
 import { analyzeRaceAudio, RaceAudio } from '../src/game/audio';
 import { createRace } from '../src/game/race';
+import { createTrackMapLayout, summarizeRaceReadability } from '../src/game/raceReadability';
 import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
 import { createPodiumCeremony } from '../src/game/scene';
@@ -70,6 +71,21 @@ describe('track data', () => {
     expect(racePodium.stats.confettiPieces).toBe(90);
     expect(finalePodium.stats.confettiPieces).toBeGreaterThan(racePodium.stats.confettiPieces);
     expect(finalePodium.stats.finaleMode).toBe(true);
+  });
+
+  it('projects each circuit into a bounded live track map route', () => {
+    for (const track of tracks) {
+      const layout = createTrackMapLayout(track);
+      const coordinates = layout.routePoints.split(' ').map((pair) => pair.split(',').map(Number));
+      expect(coordinates).toHaveLength(track.points.length + 1);
+      expect(coordinates[0]).toEqual(coordinates[coordinates.length - 1]);
+      for (const [x, y] of coordinates) {
+        expect(x).toBeGreaterThanOrEqual(0);
+        expect(x).toBeLessThanOrEqual(layout.size);
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(y).toBeLessThanOrEqual(layout.size);
+      }
+    }
   });
 });
 
@@ -203,6 +219,50 @@ describe('race simulation', () => {
     expect(snapshot.player.tires).toBeLessThan(1);
     expect(snapshot.position).toBeGreaterThanOrEqual(1);
     expect(snapshot.position).toBeLessThanOrEqual(8);
+  });
+
+  it('keeps time attack active beyond the smoke-test launch window', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    let snapshot = race.snapshot();
+    for (let i = 0; i < 8 * 30; i += 1) {
+      snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: 0 });
+    }
+    expect(snapshot.complete).toBe(false);
+    expect(snapshot.player.finished).toBe(false);
+    expect(snapshot.player.lap).toBe(0);
+    expect(snapshot.player.distance).toBeLessThan(1);
+    expect(snapshot.player.totalTime).toBeGreaterThanOrEqual(7.9);
+  });
+
+  it('requires a plausible driven lap before completing time attack', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    let snapshot = race.snapshot();
+    for (let i = 0; i < 120 * 30 && !snapshot.complete; i += 1) {
+      snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: 0 });
+    }
+    expect(snapshot.complete).toBe(true);
+    expect(snapshot.player.finishTime).toBeGreaterThan(45);
+    expect(snapshot.player.finishTime).toBeLessThan(90);
+    expect(snapshot.player.lap).toBe(1);
+  });
+
+  it('summarizes nearest rivals for the mobile race readout', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    let snapshot = race.snapshot();
+    for (let i = 0; i < 180; i += 1) {
+      snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: 0.1 });
+    }
+    const summary = summarizeRaceReadability(snapshot, tracks[0].lengthKm);
+    expect(summary.totalRacers).toBe(8);
+    expect(summary.position).toBe(snapshot.position);
+    expect(summary.nearestAhead?.meters ?? 0).toBeGreaterThanOrEqual(0);
+    expect(summary.nearestBehind?.meters ?? 0).toBeGreaterThanOrEqual(0);
+    expect([summary.nearestAhead?.shortName, summary.nearestBehind?.shortName].filter(Boolean).length).toBeGreaterThan(0);
+    expect(summary.nearestAhead?.racerId).not.toBe('player');
+    expect(summary.nearestBehind?.racerId).not.toBe('player');
   });
 });
 

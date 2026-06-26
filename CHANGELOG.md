@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0 - 2026-06-26
+
+- Added a live mobile race readout with an SVG track map, player/rival dots, and nearest ahead/behind gaps.
+- Fixed Time Attack lap progression so visual grid placement no longer completes the first lap immediately.
+- Changed tire and damage effects to cap top speed instead of compounding speed loss every frame.
+- Added debug metrics and smoke coverage for the map, live replay recorder, and eight-second active-race window.
+
 ## 1.1.0 - 2026-06-26
 
 - Added optional runtime playback for planned ElevenLabs MP3 music and voice assets.

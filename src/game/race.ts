@@ -1,9 +1,9 @@
 import type { GameMode, GameSettings, RacerDefinition, RaceResult, TrackDefinition } from '../types';
-import { progressDelta } from './trackPath';
 
 export interface RacerState {
   definition: RacerDefinition;
   progress: number;
+  distance: number;
   lap: number;
   speed: number;
   lateral: number;
@@ -40,6 +40,7 @@ export function createRace(
   const states: RacerState[] = racers.map((definition, index) => ({
     definition,
     progress: 0.985 - index * 0.006,
+    distance: 0,
     lap: 0,
     speed: 0,
     lateral: (index % 2 === 0 ? -1 : 1) * (1.1 + Math.floor(index / 2) * 1.15),
@@ -66,15 +67,18 @@ export function createRace(
         updateCpu(state, i, dt, track.difficulty);
       }
 
-      const previous = state.progress;
       const lapDistance = Math.max(0.0001, state.speed * dt / (track.lengthKm * 1000));
-      state.progress = (state.progress + lapDistance) % 1;
-      if (progressDelta(previous, state.progress) < -0.5 || (previous > 0.94 && state.progress < 0.08)) {
-        state.lap += 1;
+      const previousLap = Math.floor(state.distance);
+      state.distance += lapDistance;
+      state.progress = (0.985 - i * 0.006 + state.distance) % 1;
+      const completedLaps = Math.min(laps, Math.floor(state.distance));
+      if (completedLaps > previousLap) {
+        state.lap = completedLaps;
         state.bestLap = Math.min(state.bestLap, state.currentLapTime);
         state.currentLapTime = 0;
       }
-      if (state.lap >= laps) {
+      if (state.distance >= laps) {
+        state.lap = laps;
         state.finished = true;
         state.finishTime = state.totalTime;
       }
@@ -125,8 +129,8 @@ function updatePlayer(state: RacerState, control: RaceControl, dt: number, setti
     const wear = (0.002 + Math.abs(control.steer) * 0.012 + (control.brake ? 0.01 : 0)) * dt;
     state.tires = Math.max(0, state.tires - wear);
   }
-  state.speed *= 0.55 + state.damage * 0.45;
-  state.speed *= 0.72 + state.tires * 0.28;
+  const conditionLimit = 82 * (0.55 + state.damage * 0.45) * (0.72 + state.tires * 0.28);
+  state.speed = Math.min(state.speed, conditionLimit);
 }
 
 function updateCpu(state: RacerState, index: number, dt: number, difficulty: number): void {
@@ -141,8 +145,7 @@ function compareRacePosition(a: RacerState, b: RacerState): number {
   if (a.finished && b.finished) return a.finishTime - b.finishTime;
   if (a.finished) return -1;
   if (b.finished) return 1;
-  if (a.lap !== b.lap) return b.lap - a.lap;
-  return b.progress - a.progress;
+  return b.distance - a.distance;
 }
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
