@@ -32,6 +32,11 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
     text: 'Silverpine Switchback',
     visible: true,
   });
+  const titleMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
+  expect(titleMetrics.caption.active).toBe(false);
+  expect(titleMetrics.caption.speaker).toBeNull();
+  expect(titleMetrics.audio.speechEvents).toBe(0);
+  expect(titleMetrics.audio.lastSpeaker).toBe('');
   const titleLayout = await page.evaluate(() => {
     const title = document.querySelector<HTMLElement>('.brand-title')!;
     const flyover = document.querySelector<HTMLElement>('.flyover-label')!;
@@ -61,6 +66,8 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   menuMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
   expect(menuMetrics.menu.flyoverLabel.visible).toBe(true);
   expect(menuMetrics.menu.flyoverLabel.trackId).toBe(menuMetrics.previewTrack);
+  expect(menuMetrics.caption.active).toBe(false);
+  expect(menuMetrics.audio.speechEvents).toBe(0);
   await expect(page.locator('#menuFlyoverTrack')).not.toHaveText('Silverpine Switchback');
   await page.screenshot({ path: testInfo.outputPath('title-menu-flyover.png'), fullPage: true });
   await page.getByRole('button', { name: 'Garage' }).click();

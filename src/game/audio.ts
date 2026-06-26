@@ -51,6 +51,7 @@ export class RaceAudio {
   private radioVoiceFilterChains = new WeakSet<HTMLAudioElement>();
   private radioVoiceFilterChainCount = 0;
   private assetErrors = 0;
+  private voicePlaybackToken = 0;
 
   constructor(private readonly settings: GameSettings) {}
 
@@ -140,6 +141,19 @@ export class RaceAudio {
     }
   }
 
+  stopSpeech(): void {
+    this.voicePlaybackToken += 1;
+    if (this.currentVoiceElement) {
+      this.currentVoiceElement.pause();
+      this.currentVoiceElement.currentTime = 0;
+      this.currentVoiceElement = null;
+    }
+    this.activeGeneratedVoiceId = null;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
   beep(count: number): void {
     if (this.settings.mute || !this.context) return;
     const now = this.context.currentTime;
@@ -186,18 +200,21 @@ export class RaceAudio {
   speak(speaker: string, text: string, lineId?: string | null): void {
     this.lastSpeaker = speaker;
     if (this.settings.mute) return;
+    const token = this.voicePlaybackToken + 1;
+    this.voicePlaybackToken = token;
     this.radioClick(speaker === 'Radio');
     if (speaker === 'Radio') {
       this.radioDucks += 1;
       this.engineGain?.gain.setTargetAtTime(Math.max(0.012, this.raceFeedback.engineGain * 0.45), this.context?.currentTime ?? 0, 0.025);
       this.engineHarmonicGain?.gain.setTargetAtTime(0.004, this.context?.currentTime ?? 0, 0.025);
     }
-    if (this.playGeneratedVoice(speaker, text, lineId)) return;
-    this.speakWithBrowser(speaker, text);
+    if (this.playGeneratedVoice(speaker, text, lineId, token)) return;
+    this.speakWithBrowser(speaker, text, token);
   }
 
-  private speakWithBrowser(speaker: string, text: string): void {
+  private speakWithBrowser(speaker: string, text: string, token = this.voicePlaybackToken): void {
     if (!this.speechEnabled || typeof window === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') return;
+    if (token !== this.voicePlaybackToken) return;
     const utterance = new SpeechSynthesisUtterance(text);
     const profile = announcerVoiceProfiles[speaker as keyof typeof announcerVoiceProfiles] ?? announcerVoiceProfiles['Arthur Bell'];
     utterance.rate = profile.rate;
@@ -376,7 +393,7 @@ export class RaceAudio {
     return true;
   }
 
-  private playGeneratedVoice(speaker: string, text: string, lineId?: string | null): boolean {
+  private playGeneratedVoice(speaker: string, text: string, lineId?: string | null, token = this.voicePlaybackToken): boolean {
     const asset = matchVoiceAsset(speaker, text, lineId);
     if (!asset || this.disabledAssets.has(asset.id)) return false;
     const voice = this.loadedVoices.get(asset.id);
@@ -390,7 +407,7 @@ export class RaceAudio {
     this.activeGeneratedVoiceId = null;
     voice.currentTime = 0;
     void voice.play().then(() => {
-      if (this.currentVoiceElement === voice) {
+      if (this.currentVoiceElement === voice && token === this.voicePlaybackToken) {
         this.activeGeneratedVoiceId = asset.id;
         this.generatedSpeechEvents += 1;
       }
@@ -401,7 +418,7 @@ export class RaceAudio {
         this.currentVoiceElement = null;
         this.activeGeneratedVoiceId = null;
       }
-      this.speakWithBrowser(speaker, text);
+      this.speakWithBrowser(speaker, text, token);
     });
     return true;
   }

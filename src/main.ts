@@ -342,7 +342,6 @@ const trackMapDotElements = new Map<string, SVGCircleElement>();
 
 initUi();
 loadMenuScene();
-showCaption('Arthur Bell', fill(dialogue.title[0][1]));
 
 window.addEventListener('resize', resize);
 window.addEventListener('keydown', (event) => {
@@ -434,11 +433,7 @@ function initUi(): void {
       showScreen('tutorial');
       queueDialogue(dialogue.tutorial, 3.8);
     } else if (action === 'back' || action === 'menu') {
-      gameState = 'menu';
-      audio.stopEngine();
-      setSetupPanelOpen(false);
-      showScreen('menu');
-      loadMenuScene();
+      returnToTitleMenu();
     } else if (action === 'race') {
       startPreRace();
     } else if (action === 'nextRace') {
@@ -449,9 +444,7 @@ function initUi(): void {
       } else if (mode === 'campaign') {
         showCampaignFinale();
       } else {
-        gameState = 'menu';
-        showScreen('menu');
-        loadMenuScene();
+        returnToTitleMenu();
       }
     } else if (action === 'replay') {
       showReplayScreen();
@@ -536,9 +529,20 @@ function update(dt: number): void {
 
   captionTimer -= dt;
   if (captionTimer <= 0) {
-    if (!showNextQueuedCaption() && (gameState === 'menu' || gameState === 'race')) rotateCaption();
+    if (!showNextQueuedCaption() && gameState === 'race') rotateCaption();
   }
   exposeDebug(dt);
+}
+
+function returnToTitleMenu(): void {
+  gameState = 'menu';
+  audio.stopEngine();
+  audio.stopSpeech();
+  clearCaptionQueue(true);
+  hideCaption();
+  setSetupPanelOpen(false);
+  showScreen('menu');
+  loadMenuScene();
 }
 
 function showSetup(): void {
@@ -1034,6 +1038,14 @@ function clearCaptionQueue(resetMetrics: boolean): void {
     captionQueueDelivered = 0;
     captionQueueSpeakers = [];
   }
+}
+
+function hideCaption(): void {
+  caption.textContent = '';
+  caption.classList.remove('active');
+  lastCaptionSpeaker = null;
+  lastCaptionText = null;
+  captionTimer = 0;
 }
 
 function showCaption(name: string, text: string, duration = 5.5, lineId?: string | null): void {

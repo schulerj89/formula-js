@@ -399,6 +399,54 @@ describe('audio data', () => {
     }
   });
 
+  it('stops generated and browser voice playback without allowing stale fallback speech', async () => {
+    const speak = vi.fn();
+    const cancel = vi.fn();
+    class FakeSpeechSynthesisUtterance {
+      rate = 1;
+      pitch = 1;
+      volume = 1;
+      voice?: SpeechSynthesisVoice;
+
+      constructor(readonly text: string) {}
+    }
+    vi.stubGlobal('window', {
+      speechSynthesis: {
+        cancel,
+        getVoices: () => [],
+        speak,
+      },
+    });
+    vi.stubGlobal('SpeechSynthesisUtterance', FakeSpeechSynthesisUtterance);
+    try {
+      const audio = new RaceAudio({ ...settings, mute: false });
+      const generatedVoice = {
+        currentTime: 8,
+        pause: vi.fn(),
+        play: vi.fn(() => Promise.reject(new Error('late decode failed'))),
+      } as unknown as HTMLAudioElement;
+      const internals = audio as unknown as {
+        loadedVoices: Map<string, HTMLAudioElement>;
+      };
+      internals.loadedVoices.set('mags-lights', generatedVoice);
+
+      audio.speak('Mags Whitlow', 'Five red lights, then it is noise, nerves, and no excuses.');
+      audio.stopSpeech();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const metrics = audio.metrics();
+      expect(generatedVoice.pause).toHaveBeenCalledOnce();
+      expect(generatedVoice.currentTime).toBe(0);
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(speak).not.toHaveBeenCalled();
+      expect(metrics.assets.activeGeneratedVoice).toBeNull();
+      expect(metrics.assets.fallbackSpeechEvents).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('keeps generated voice playback single-channel', async () => {
     const audio = new RaceAudio({ ...settings, mute: false });
     const firstVoice = {

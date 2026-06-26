@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.33.1 - 2026-06-26
+
+- Removed rotating announcer speech from the title/menu screen so only menu music plays there.
+- Added voice-stop handling when returning to the title and guarded stale generated-voice fallbacks from starting browser speech later.
+- Added unit and browser coverage for silent title captions and stopped voice playback.
+
 ## 1.33.0 - 2026-06-26
 
 - Added campaign race objectives with deterministic target positions and rival-to-beat pressure for each race.
