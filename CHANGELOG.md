@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.29.0 - 2026-06-26
+
+- Reworked the title into a CSS-only motorsport wordmark with split-line styling, race-accent bars, and local fallback fonts.
+- Added menu debug metrics and browser coverage for the wordmark treatment, zero letter spacing, and non-overlap with primary actions.
+
 ## 1.28.1 - 2026-06-26
 
 - Tightened `AGENTS.md` so uncertain domain decisions explicitly require creating or using the relevant expert/subagent and recording the outcome in `docs/decisions/`.

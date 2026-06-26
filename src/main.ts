@@ -140,7 +140,10 @@ root.innerHTML = `
     <section class="screen active" data-screen="menu" data-menu-stage="title">
       <div class="menu-top">
         <p class="kicker">Mobile formula racing</p>
-        <h1>Gridline Apex</h1>
+        <h1 class="brand-title" data-title-treatment="motorsport-wordmark" aria-label="Gridline Apex">
+          <span class="brand-line brand-line-grid">Gridline</span>
+          <span class="brand-line brand-line-apex">Apex</span>
+        </h1>
         <div class="menu-actions">
           <button class="primary" data-action="campaign">Campaign</button>
           <button class="secondary" data-action="timeAttack">Time Attack</button>
@@ -285,6 +288,7 @@ const playerNameInput = root.querySelector<HTMLInputElement>('#playerName')!;
 const trackSelect = root.querySelector<HTMLSelectElement>('#trackSelect')!;
 const trackStrip = root.querySelector<HTMLDivElement>('#trackStrip')!;
 const menuScreen = root.querySelector<HTMLElement>('[data-screen="menu"]')!;
+const brandTitle = root.querySelector<HTMLElement>('.brand-title')!;
 const setupPanel = root.querySelector<HTMLDivElement>('#setupPanel')!;
 const bodyPaintSwatches = root.querySelector<HTMLDivElement>('#bodyPaintSwatches')!;
 const helmetPaintSwatches = root.querySelector<HTMLDivElement>('#helmetPaintSwatches')!;
@@ -1473,6 +1477,7 @@ function buildDebugMetrics() {
   const worst = sortedFrameTimes[sortedFrameTimes.length - 1] ?? 0;
   const fps = p50 > 0 ? 1 / p50 : 0;
   const cpuRacecraft = summarizeCpuRacecraft(latestSnapshot);
+  const titleLetterSpacing = getComputedStyle(brandTitle).letterSpacing;
   return {
     calls: renderer.info.render.calls,
     triangles: renderer.info.render.triangles,
@@ -1520,6 +1525,13 @@ function buildDebugMetrics() {
       visibleActionCount: [...root.querySelectorAll<HTMLElement>('[data-screen="menu"] .menu-top button, [data-screen="menu"] .menu-top a')].filter(
         (item) => item.offsetParent !== null,
       ).length,
+      titleTreatment: {
+        id: brandTitle.dataset.titleTreatment ?? null,
+        lineCount: brandTitle.querySelectorAll('.brand-line').length,
+        letterSpacing: titleLetterSpacing === 'normal' ? '0px' : titleLetterSpacing,
+        computedLetterSpacing: titleLetterSpacing,
+        width: Math.round(brandTitle.getBoundingClientRect().width),
+      },
     },
     track: selectedTrack.id,
     previewTrack: menuPreviewTrack.id,

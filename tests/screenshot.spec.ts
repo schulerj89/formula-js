@@ -8,6 +8,7 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await page.goto('/');
   await page.waitForFunction(() => Boolean((window as any).__GRIDLINE_APEX__?.ready));
   await expect(page.getByRole('heading', { name: 'Gridline Apex' })).toBeVisible();
+  await expect(page.locator('.brand-title')).toHaveAttribute('data-title-treatment', 'motorsport-wordmark');
   await expect(page.getByRole('button', { name: 'Campaign' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Time Attack' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible();
@@ -19,6 +20,26 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await expect(page.locator('[data-screen="menu"]')).toHaveAttribute('data-menu-stage', 'title');
   let menuMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics?.menu);
   expect(menuMetrics.setupOpen).toBe(false);
+  expect(menuMetrics.titleTreatment).toMatchObject({
+    id: 'motorsport-wordmark',
+    lineCount: 2,
+    letterSpacing: '0px',
+  });
+  expect(menuMetrics.titleTreatment.width).toBeGreaterThan(160);
+  const titleLayout = await page.evaluate(() => {
+    const title = document.querySelector<HTMLElement>('.brand-title')!;
+    const actions = document.querySelector<HTMLElement>('.menu-actions')!;
+    const titleRect = title.getBoundingClientRect();
+    const actionsRect = actions.getBoundingClientRect();
+    return {
+      titleBottom: titleRect.bottom,
+      actionsTop: actionsRect.top,
+      viewportWidth: window.innerWidth,
+      titleWidth: titleRect.width,
+    };
+  });
+  expect(titleLayout.titleWidth).toBeLessThanOrEqual(titleLayout.viewportWidth);
+  expect(titleLayout.titleBottom).toBeLessThan(titleLayout.actionsTop);
   await page.screenshot({ path: testInfo.outputPath('title-menu.png'), fullPage: true });
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.previewTrack !== (window as any).__GRIDLINE_APEX__?.metrics?.track, null, {
     timeout: 10_000,
