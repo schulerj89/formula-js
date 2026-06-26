@@ -48,4 +48,6 @@ export interface GameSettings {
   realisticTires: boolean;
   realisticDamage: boolean;
   leaderboard: boolean;
+  bodyPaint: string;
+  helmetPaint: string;
 }

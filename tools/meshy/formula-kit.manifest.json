@@ -1,0 +1,43 @@
+{
+  "apiKeyFile": "C:/Users/joshs/Projects/meshy-api-key.txt",
+  "outputDir": "public/assets/formula-kit",
+  "metadataDir": "tools/meshy/generated/formula-kit",
+  "defaultModel": "meshy-6",
+  "defaultTargetFormats": ["glb"],
+  "maxAssetBytes": 6000000,
+  "assets": [
+    {
+      "id": "formula-chassis",
+      "fileName": "formula-chassis.glb",
+      "targetPolycount": 180000,
+      "modelType": "hard_surface",
+      "shouldRemesh": true,
+      "topology": "quad-dominant game-ready hard surface",
+      "referenceImage": "public/assets/reference/formula-kit/formula-chassis-reference.png",
+      "prompt": "original open-wheel formula racing chassis without wheels, mobile Three.js racing game asset, aerodynamic nose, sidepods, cockpit opening, rear wing, front wing mounts, color-customizable body panels, isolated prop, no driver, no logos, no readable text",
+      "texturePrompt": "mostly untextured or simple neutral material zones for runtime recoloring, matte black underbody, clean carbon composite and paintable white body panels, no decals, no logo"
+    },
+    {
+      "id": "formula-wheel",
+      "fileName": "formula-wheel.glb",
+      "targetPolycount": 28000,
+      "modelType": "hard_surface",
+      "shouldRemesh": true,
+      "topology": "cylindrical game-ready wheel with clean axle origin",
+      "referenceImage": "public/assets/reference/formula-kit/formula-wheel-reference.png",
+      "prompt": "standalone formula racing slick tire and wheel assembly, reusable four-wheel prop for a mobile Three.js racing game, clean axle attachment point, dark graphite rim, brake disc hint, isolated prop, no branding, no readable text",
+      "texturePrompt": "matte black slick rubber, dark graphite rim, subtle silver brake hardware, no tire lettering, no logo"
+    },
+    {
+      "id": "formula-driver",
+      "fileName": "formula-driver.glb",
+      "targetPolycount": 90000,
+      "modelType": "character",
+      "shouldRemesh": true,
+      "topology": "rigging-friendly humanoid with separable helmet mesh",
+      "referenceImage": "public/assets/reference/formula-kit/formula-driver-reference.png",
+      "prompt": "formula racing driver character in seated cockpit-ready neutral pose, separate customizable helmet, simple suit panels for recoloring, gloved hands forward, mobile Three.js racing game asset, rigging-friendly, no car, no logo, no readable text",
+      "texturePrompt": "simple fabric racing suit with neutral dark material and paintable panel zones, glossy helmet shell, dark visor, no decals, no sponsor marks"
+    }
+  ]
+}

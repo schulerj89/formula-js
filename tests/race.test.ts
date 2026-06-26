@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { cpuRacers, playerTemplate } from '../src/data/racers';
 import { tracks } from '../src/data/tracks';
 import { musicThemes } from '../src/data/audio';
+import { formulaAssetManifest } from '../src/data/assets';
+import { bodyPaintOptions, helmetPaintOptions } from '../src/data/customization';
 import { createRace } from '../src/game/race';
 import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
 import { createReplayRecorder, findReplayFrame } from '../src/game/replay';
@@ -16,6 +18,8 @@ const settings: GameSettings = {
   realisticTires: true,
   realisticDamage: true,
   leaderboard: true,
+  bodyPaint: 'scarlet',
+  helmetPaint: 'ivory',
 };
 
 describe('track data', () => {
@@ -40,6 +44,16 @@ describe('audio data', () => {
       expect(theme.bpm).toBeLessThanOrEqual(140);
       expect(theme.leadOffsets.length).toBeGreaterThanOrEqual(8);
     }
+  });
+});
+
+describe('customization and asset pipeline data', () => {
+  it('defines body and helmet paint options plus modular asset budgets', () => {
+    expect(bodyPaintOptions.length).toBeGreaterThanOrEqual(5);
+    expect(helmetPaintOptions.length).toBeGreaterThanOrEqual(5);
+    expect(formulaAssetManifest.referenceImages.chassis).toContain('formula-chassis-reference.png');
+    expect(formulaAssetManifest.plannedGlb.wheel).toContain('formula-wheel.glb');
+    expect(formulaAssetManifest.budgets.refinedAssetMaxBytes).toBeLessThanOrEqual(6_000_000);
   });
 });
 

@@ -1,6 +1,8 @@
 import './styles.css';
 import * as THREE from 'three';
 import { musicThemes } from './data/audio';
+import { formulaAssetManifest } from './data/assets';
+import { bodyPaintOptions, findPaint, helmetPaintOptions } from './data/customization';
 import { dialogue } from './data/dialogue';
 import { cpuRacers, playerTemplate } from './data/racers';
 import { tracks } from './data/tracks';
@@ -24,6 +26,8 @@ const settings: GameSettings = {
   realisticTires: localStorage.getItem('gridline.realisticTires') !== 'false',
   realisticDamage: localStorage.getItem('gridline.realisticDamage') !== 'false',
   leaderboard: localStorage.getItem('gridline.leaderboard') !== 'false',
+  bodyPaint: localStorage.getItem('gridline.bodyPaint') || bodyPaintOptions[0].id,
+  helmetPaint: localStorage.getItem('gridline.helmetPaint') || helmetPaintOptions[0].id,
 };
 
 let gameState: GameState = 'menu';
@@ -72,6 +76,14 @@ root.innerHTML = `
         <div class="setup-grid">
           <label class="field"><span>Name</span><input id="playerName" maxlength="18" /></label>
           <label class="field"><span>Track</span><select id="trackSelect"></select></label>
+          <div class="garage-row">
+            <span>Body</span>
+            <div class="swatches" id="bodyPaintSwatches"></div>
+          </div>
+          <div class="garage-row">
+            <span>Helmet</span>
+            <div class="swatches" id="helmetPaintSwatches"></div>
+          </div>
           <button class="primary" data-action="race">Race</button>
         </div>
         <div class="track-strip" id="trackStrip"></div>
@@ -154,6 +166,8 @@ const audio = new RaceAudio(settings);
 const playerNameInput = root.querySelector<HTMLInputElement>('#playerName')!;
 const trackSelect = root.querySelector<HTMLSelectElement>('#trackSelect')!;
 const trackStrip = root.querySelector<HTMLDivElement>('#trackStrip')!;
+const bodyPaintSwatches = root.querySelector<HTMLDivElement>('#bodyPaintSwatches')!;
+const helmetPaintSwatches = root.querySelector<HTMLDivElement>('#helmetPaintSwatches')!;
 const caption = root.querySelector<HTMLDivElement>('#caption')!;
 const controls = root.querySelector<HTMLDivElement>('#controls')!;
 const hud = root.querySelector<HTMLDivElement>('.hud')!;
@@ -184,6 +198,8 @@ function initUi(): void {
   playerNameInput.value = settings.playerName;
   trackSelect.innerHTML = tracks.map((track) => `<option value="${track.id}">${track.name}</option>`).join('');
   trackSelect.value = selectedTrack.id;
+  bodyPaintSwatches.innerHTML = renderSwatches('bodyPaint', bodyPaintOptions, settings.bodyPaint);
+  helmetPaintSwatches.innerHTML = renderSwatches('helmetPaint', helmetPaintOptions, settings.helmetPaint);
   trackStrip.innerHTML = tracks
     .map(
       (track) => `
@@ -211,6 +227,16 @@ function initUi(): void {
     if (trackId) {
       selectedTrack = tracks.find((track) => track.id === trackId) ?? selectedTrack;
       trackSelect.value = selectedTrack.id;
+      initUi();
+      loadMenuScene();
+      return;
+    }
+    const paintTarget = target.closest<HTMLElement>('[data-paint-target]')?.dataset.paintTarget;
+    const paintId = target.closest<HTMLElement>('[data-paint-id]')?.dataset.paintId;
+    if (paintTarget && paintId) {
+      if (paintTarget === 'bodyPaint') settings.bodyPaint = paintId;
+      if (paintTarget === 'helmetPaint') settings.helmetPaint = paintId;
+      saveSettings();
       initUi();
       loadMenuScene();
       return;
@@ -383,7 +409,9 @@ function finishRace(snapshot: RaceSnapshot): void {
 }
 
 function buildRacers(): RacerDefinition[] {
-  return [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+  const bodyPaint = findPaint(bodyPaintOptions, settings.bodyPaint, bodyPaintOptions[0]);
+  const helmetPaint = findPaint(helmetPaintOptions, settings.helmetPaint, helmetPaintOptions[0]);
+  return [{ ...playerTemplate, name: settings.playerName, color: bodyPaint.value, helmet: helmetPaint.value }, ...cpuRacers];
 }
 
 function loadMenuScene(): void {
@@ -637,6 +665,8 @@ function saveSettings(): void {
   localStorage.setItem('gridline.realisticTires', `${settings.realisticTires}`);
   localStorage.setItem('gridline.realisticDamage', `${settings.realisticDamage}`);
   localStorage.setItem('gridline.leaderboard', `${settings.leaderboard}`);
+  localStorage.setItem('gridline.bodyPaint', settings.bodyPaint);
+  localStorage.setItem('gridline.helmetPaint', settings.helmetPaint);
 }
 
 function showScreen(screen: GameState | 'settings' | null): void {
@@ -678,6 +708,7 @@ function exposeDebug(): void {
     replaySampleRate: lastReplay?.sampleRate ?? 0,
     campaignLeader: campaignLeader(campaignScores)?.name ?? null,
     audio: audio.metrics(),
+    assetKit: formulaAssetManifest,
   };
   debug.textContent = `calls ${metrics.calls}\ntris ${metrics.triangles}\ngeos ${metrics.geometries}\ntex ${metrics.textures}\nfps ${metrics.estimatedFps}\nreplay ${metrics.replayFrames}`;
   debug.classList.toggle('active', settings.performanceMode === 'highDetail');
@@ -690,6 +721,15 @@ function exposeDebug(): void {
     campaignScores,
     replay: lastReplay,
   };
+}
+
+function renderSwatches(target: 'bodyPaint' | 'helmetPaint', options: typeof bodyPaintOptions, selected: string): string {
+  return options
+    .map(
+      (option) =>
+        `<button class="swatch ${option.id === selected ? 'selected' : ''}" data-paint-target="${target}" data-paint-id="${option.id}" title="${option.label}" aria-label="${option.label}" style="--swatch:${option.css}"></button>`,
+    )
+    .join('');
 }
 
 function recordFrameTime(dt: number): void {

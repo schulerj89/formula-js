@@ -168,6 +168,36 @@ p {
   color: #d8e7f3;
 }
 
+.garage-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 10px;
+  align-items: center;
+  color: #b7c7d7;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.swatches {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.swatch {
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgb(255 255 255 / 22%);
+  border-radius: 50%;
+  background: var(--swatch);
+  cursor: pointer;
+}
+
+.swatch.selected {
+  border-color: #f7c948;
+  box-shadow: 0 0 0 3px rgb(247 201 72 / 24%);
+}
+
 .track-strip {
   display: grid;
   gap: 8px;

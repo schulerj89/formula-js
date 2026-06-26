@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 - 2026-06-26
+
+- Added player garage paint swatches for body and helmet customization.
+- Added GPT-image-generated formula chassis, wheel, and driver reference images for the future Meshy pass.
+- Added a Meshy-ready modular formula kit manifest with separate chassis, wheel, and driver targets.
+- Added a runtime asset registry and asset-pipeline decision doc with GLB budgets and fallback rules.
+
 ## 0.3.0 - 2026-06-26
 
 - Added four procedural WebAudio music themes for menu, pre-race, podium, and campaign finale states.

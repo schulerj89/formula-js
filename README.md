@@ -10,6 +10,7 @@ Mobile-first Three.js formula racing game.
 - `npm run screenshot` captures menu and gameplay artifacts.
 - `npm run audio:plan` refreshes the dry-run ElevenLabs audio manifest.
 - `npm run audio:generate` generates ElevenLabs MP3s when voice IDs and an API key are configured locally.
+- `npm run assets:meshy:preview` starts the Meshy preview workflow from the formula-kit manifest when a Meshy key is configured locally.
 
 ## Current Slice
 
@@ -19,6 +20,8 @@ Mobile-first Three.js formula racing game.
 - Bounded end-of-race replay playback from compact race-state samples.
 - Procedural menu, pre-race, podium, and finale music with no music during active racing.
 - Announcer/radio speech hooks plus an ElevenLabs asset pipeline manifest.
+- Player garage paint swatches for body and helmet customization.
+- GPT-image reference art and a Meshy-ready manifest for modular chassis, wheel, and driver GLBs.
 - Four procedural race circuits with red/white kerbs, trees, buildings, and landmarks.
 - Player plus seven CPU drivers with static names.
 - Press-to-go or split brake/go mobile controls.

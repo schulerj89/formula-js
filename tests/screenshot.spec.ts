@@ -8,6 +8,8 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.previewTrack !== (window as any).__GRIDLINE_APEX__?.metrics?.track, null, {
     timeout: 10_000,
   });
+  await page.getByRole('button', { name: 'Azure' }).click();
+  await page.getByRole('button', { name: 'Gold' }).click();
 
   await page.getByRole('button', { name: 'Time Attack' }).click();
   await page.getByRole('button', { name: 'Race' }).click();
@@ -24,4 +26,8 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.estimatedFps).toBeGreaterThan(0);
   expect(metrics.p95FrameMs).toBeGreaterThan(0);
   expect(metrics.audio.musicCue).toBe('Silent');
+  expect(metrics.assetKit.referenceImages.chassis).toContain('formula-chassis-reference.png');
+  const settings = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.settings);
+  expect(settings.bodyPaint).toBe('azure');
+  expect(settings.helmetPaint).toBe('gold');
 });
