@@ -28,6 +28,8 @@ Mobile-first Three.js formula racing game.
 - Dynamic active-race commentary for position gains/losses with cooldown and radio-priority metrics.
 - Player garage paint swatches for body and helmet customization.
 - GPT-image reference art, Meshy preview GLBs, and a runtime loader for modular chassis, wheel, and driver assets.
+- Shared driver rig with separate customizable helmet, visor, generated suit support, idle motion, and podium celebration arms.
+- Generated asset metadata tracks actual GLB triangles to keep high-detail mode under the browser render budget.
 - Four procedural race circuits with red/white kerbs, trees, buildings, and landmarks.
 - Player plus seven CPU drivers with static names.
 - Press-to-go or split brake/go mobile controls.

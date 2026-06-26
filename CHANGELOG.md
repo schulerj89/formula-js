@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.7.0 - 2026-06-26
+
+- Added a shared customizable driver rig with named helmet, visor, and celebration arm parts.
+- Attached the same rig contract to generated high-detail cars so helmet customization remains separate from the generated driver suit.
+- Expanded podium/finale celebration animation with arm and helmet motion while preserving idle cockpit motion.
+- Updated generated-asset triangle metadata from the actual GLBs and exposed driver-rig debug metrics for race, podium, and finale smoke coverage.
+
 ## 1.6.0 - 2026-06-26
 
 - Added dynamic race commentary for player position gains and losses during active racing.

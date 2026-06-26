@@ -9,7 +9,7 @@ import { tracks } from './data/tracks';
 import { RaceAudio } from './game/audio';
 import { applyCampaignResults, campaignLeader, createCampaignScores, type CampaignScore } from './game/campaign';
 import { createFormulaAssetManager } from './game/formulaAssets';
-import { animateDriverIdle } from './game/models';
+import { animateDriverIdle, summarizeDriverRig } from './game/models';
 import { createRace, createResults, type RaceControl, type RaceSnapshot } from './game/race';
 import { createPositionCommentary, type RaceCommentaryKind } from './game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability, type TrackMapLayout } from './game/raceReadability';
@@ -586,7 +586,6 @@ function updatePodiumCamera(dt: number, finale: boolean): void {
   const target = winner?.position ?? new THREE.Vector3();
   camera.position.set(target.x + Math.cos(elapsed * 0.45) * radius, finale ? 10 : 7, target.z + Math.sin(elapsed * 0.45) * radius);
   camera.lookAt(target.x, 1.5, target.z);
-  if (winner) animateDriverIdle(winner, elapsed, true, finale);
   for (const car of sceneBuild.cars.values()) animateDriverIdle(car, elapsed, car === winner, finale);
   void dt;
 }
@@ -1127,6 +1126,7 @@ function exposeDebug(): void {
       parkedCarCount: podiumParkedCarCount,
       stats: podiumStats,
     },
+    driverRig: summarizeSceneDriverRigs(),
     audio: audio.metrics(),
     assetKit: formulaAssetManifest,
     assetStatus: formulaAssets.metrics(),
@@ -1146,6 +1146,41 @@ function exposeDebug(): void {
       forceContact: forceContactForSmoke,
       forcePositionGain: forcePositionGainForSmoke,
     },
+  };
+}
+
+function summarizeSceneDriverRigs(): {
+  activeCars: number;
+  visibleCars: number;
+  carMeshCount: number;
+  customizableDrivers: number;
+  torsos: number;
+  helmets: number;
+  visors: number;
+  armPairs: number;
+  generatedSuits: number;
+  podiumCelebratingRacerId: string | null;
+} {
+  const cars = sceneBuild ? [...sceneBuild.cars.values()] : [];
+  const summaries = cars.map((car) => summarizeDriverRig(car));
+  const carMeshCount = cars.reduce((total, car) => {
+    let meshes = 0;
+    car.traverse((object) => {
+      if ((object as THREE.Mesh).isMesh) meshes += 1;
+    });
+    return total + meshes;
+  }, 0);
+  return {
+    activeCars: cars.length,
+    visibleCars: cars.filter((car) => car.visible).length,
+    carMeshCount,
+    customizableDrivers: summaries.filter((summary) => summary.hasDriver).length,
+    torsos: summaries.filter((summary) => summary.hasTorso).length,
+    helmets: summaries.filter((summary) => summary.hasHelmet).length,
+    visors: summaries.filter((summary) => summary.hasVisor).length,
+    armPairs: summaries.filter((summary) => summary.armCount >= 2).length,
+    generatedSuits: summaries.filter((summary) => summary.hasGeneratedSuit).length,
+    podiumCelebratingRacerId: gameState === 'podium' || gameState === 'finale' ? podiumFocusId : null,
   };
 }
 

@@ -105,6 +105,15 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.assetStatus.generatedCarsCreated).toBeGreaterThan(0);
   expect(metrics.assetStatus.proceduralCarsCreated).toBeGreaterThan(0);
   expect(metrics.assetStatus.loadedAssetIds.sort()).toEqual(['chassis', 'driver', 'wheel']);
+  expect(metrics.driverRig.activeCars).toBe(8);
+  expect(metrics.driverRig.visibleCars).toBe(8);
+  expect(metrics.driverRig.carMeshCount).toBeGreaterThan(40);
+  expect(metrics.driverRig.customizableDrivers).toBe(8);
+  expect(metrics.driverRig.torsos).toBe(7);
+  expect(metrics.driverRig.helmets).toBe(8);
+  expect(metrics.driverRig.visors).toBe(8);
+  expect(metrics.driverRig.armPairs).toBe(8);
+  expect(metrics.driverRig.generatedSuits).toBeGreaterThan(0);
   const settings = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.settings);
   expect(settings.bodyPaint).toBe('azure');
   expect(settings.helmetPaint).toBe('gold');
@@ -120,6 +129,8 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(podiumMetrics.podium.parkedCarCount).toBe(5);
   expect(podiumMetrics.podium.stats.platforms).toBe(3);
   expect(podiumMetrics.podium.stats.confettiPieces).toBe(90);
+  expect(podiumMetrics.driverRig.visibleCars).toBe(3);
+  expect(podiumMetrics.driverRig.podiumCelebratingRacerId).toBe('player');
 
   await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.debug?.forcePodium?.(true));
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'finale');
@@ -130,4 +141,6 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(finaleMetrics.podium.stats.confettiPieces).toBeGreaterThan(podiumMetrics.podium.stats.confettiPieces);
   expect(finaleMetrics.podium.stagedCarCount).toBe(3);
   expect(finaleMetrics.podium.parkedCarCount).toBe(5);
+  expect(finaleMetrics.driverRig.visibleCars).toBe(3);
+  expect(finaleMetrics.driverRig.podiumCelebratingRacerId).toBe('player');
 });

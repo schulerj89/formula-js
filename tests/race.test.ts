@@ -13,6 +13,7 @@ import { applyCampaignResults, createCampaignScores } from '../src/game/campaign
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
 import { createPodiumCeremony } from '../src/game/scene';
 import { TrackPath } from '../src/game/trackPath';
+import { animateDriverIdle, createFormulaCar, summarizeDriverRig } from '../src/game/models';
 import type { GameSettings } from '../src/types';
 
 const settings: GameSettings = {
@@ -204,6 +205,29 @@ describe('customization and asset pipeline data', () => {
     expect(formulaAssetManifest.referenceImages.chassis).toContain('formula-chassis-reference.png');
     expect(formulaAssetManifest.plannedGlb.wheel).toContain('formula-wheel.glb');
     expect(formulaAssetManifest.budgets.refinedAssetMaxBytes).toBeLessThanOrEqual(6_000_000);
+    expect(formulaAssetManifest.generatedTriangles.chassis).toBeLessThanOrEqual(formulaAssetManifest.budgets.chassisTriangles);
+    expect(formulaAssetManifest.generatedTriangles.wheel).toBeLessThanOrEqual(formulaAssetManifest.budgets.wheelTriangles);
+    expect(formulaAssetManifest.generatedTriangles.driver).toBeLessThanOrEqual(formulaAssetManifest.budgets.driverTriangles);
+  });
+
+  it('builds a customizable driver rig with separate helmet, visor, and celebration arms', () => {
+    const car = createFormulaCar(0xe53935, 0xffd166);
+    const summary = summarizeDriverRig(car);
+
+    expect(summary.hasDriver).toBe(true);
+    expect(summary.hasTorso).toBe(true);
+    expect(summary.hasHelmet).toBe(true);
+    expect(summary.hasVisor).toBe(true);
+    expect(summary.armCount).toBe(2);
+
+    const driver = car.getObjectByName('customizable-driver')!;
+    const leftArm = driver.getObjectByName('celebration-arm-left')!;
+    const idleArmRotation = leftArm.rotation.z;
+    animateDriverIdle(car, 0.8, true, true);
+
+    expect(driver.position.y).toBeGreaterThanOrEqual(driver.userData.baseY);
+    expect(leftArm.rotation.z).not.toBe(idleArmRotation);
+    expect(car.getObjectByName('customizable-helmet')).toBeTruthy();
   });
 });
 

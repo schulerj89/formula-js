@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { formulaAssetManifest } from '../data/assets';
-import { createFormulaCar } from './models';
+import { createDriverRig, createFormulaCar } from './models';
 
 type AssetId = keyof typeof formulaAssetManifest.plannedGlb;
 
@@ -125,11 +125,14 @@ function createGeneratedFormulaCar(kit: LoadedFormulaKit, color: number, helmet:
   }
 
   const driver = cloneRenderable(kit.driver);
-  driver.name = 'customizable-driver';
-  normalizeAsset(driver, new THREE.Vector3(0.86, 1.18, 0.92));
-  tintMeshes(driver, helmet, 0.28);
-  driver.position.set(0, 0.5, -0.34);
-  group.add(driver);
+  driver.name = 'generated-driver-suit';
+  normalizeAsset(driver, new THREE.Vector3(0.64, 0.72, 0.68));
+  tintMeshes(driver, 0x101820, 0.58);
+  driver.position.y = -0.05;
+  const driverRig = createDriverRig(helmet, { includeTorso: false, suitObject: driver });
+  driverRig.position.set(0, 0.73, -0.34);
+  driverRig.userData.baseY = driverRig.position.y;
+  group.add(driverRig);
 
   group.scale.setScalar(0.86);
   return group;

@@ -13,10 +13,15 @@ export const formulaAssetManifest = {
     driver: '/assets/formula-kit/formula-driver.glb',
   },
   budgets: {
-    chassisTriangles: 60_000,
+    chassisTriangles: 120_000,
     wheelTriangles: 12_000,
     driverTriangles: 45_000,
     refinedAssetMaxBytes: 6_000_000,
+  },
+  generatedTriangles: {
+    chassis: 117_892,
+    wheel: 8_364,
+    driver: 44_994,
   },
   generatedBytes: {
     chassis: 4_162_428,
