@@ -634,6 +634,7 @@ interface ValidationTagOptions {
   validationRadius?: number;
   allowRoadOverlap?: boolean;
   roadOverlapMode?: RoadOverlapMode;
+  validationProbeLocalPoints?: Array<[number, number, number]>;
 }
 
 interface ValidationCandidate {
@@ -662,6 +663,7 @@ function tagForValidation(
   object.userData.validationRadius = options.validationRadius ?? defaultValidationRadius(category);
   object.userData.allowRoadOverlap = options.allowRoadOverlap ?? (roadOverlapMode === 'allowed' || roadOverlapMode === 'overhead' || roadOverlapMode === 'exempt');
   object.userData.roadOverlapMode = roadOverlapMode;
+  if (options.validationProbeLocalPoints) object.userData.validationProbeLocalPoints = options.validationProbeLocalPoints;
 }
 
 export function validateTrackEnvironment(scene: THREE.Object3D, path: TrackPath, track: TrackDefinition): EnvironmentValidationReport {
@@ -801,6 +803,7 @@ function createTrackSegments(path: TrackPath, segmentCount = VALIDATION_SEGMENTS
 }
 
 function validationCandidates(object: THREE.Object3D): ValidationCandidate[] {
+  const probeLocalPoints = validationProbeLocalPointsForObject(object);
   if ((object as THREE.InstancedMesh).isInstancedMesh) {
     const instanced = object as THREE.InstancedMesh;
     const matrix = new THREE.Matrix4();
@@ -814,12 +817,36 @@ function validationCandidates(object: THREE.Object3D): ValidationCandidate[] {
       worldMatrix.multiplyMatrices(instanced.matrixWorld, matrix);
       worldMatrix.decompose(position, rotation, scale);
       candidates.push({ position: position.clone(), name: `${object.name || object.userData.category || 'instanced-object'}#${i}` });
+      probeLocalPoints.forEach((probe, probeIndex) => {
+        candidates.push({
+          position: probe.clone().applyMatrix4(worldMatrix),
+          name: `${object.name || object.userData.category || 'instanced-object'}#${i}@probe${probeIndex}`,
+        });
+      });
     }
     return candidates;
   }
   const position = new THREE.Vector3();
   object.getWorldPosition(position);
-  return [{ position, name: object.name || object.userData.category || 'object' }];
+  const candidates: ValidationCandidate[] = [{ position, name: object.name || object.userData.category || 'object' }];
+  probeLocalPoints.forEach((probe, probeIndex) => {
+    candidates.push({
+      position: probe.clone().applyMatrix4(object.matrixWorld),
+      name: `${object.name || object.userData.category || 'object'}@probe${probeIndex}`,
+    });
+  });
+  return candidates;
+}
+
+function validationProbeLocalPointsForObject(object: THREE.Object3D): THREE.Vector3[] {
+  const rawPoints = object.userData.validationProbeLocalPoints;
+  if (!Array.isArray(rawPoints)) return [];
+  return rawPoints.flatMap((point) => {
+    if (!Array.isArray(point) || point.length < 3) return [];
+    const [x, y, z] = point.map(Number);
+    if (![x, y, z].every(Number.isFinite)) return [];
+    return [new THREE.Vector3(x, y, z)];
+  });
 }
 
 function getNearestTrackSampleFromSegments(position: THREE.Vector3, trackSegments: TrackSegment[]): TrackRoadSample {
@@ -971,6 +998,18 @@ function roundCoordinate(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
+function createValidationProbeGrid(length: number, width: number, xSteps: number, zSteps: number): Array<[number, number, number]> {
+  const points: Array<[number, number, number]> = [];
+  for (let xIndex = 0; xIndex <= xSteps; xIndex += 1) {
+    const x = -length / 2 + length * (xIndex / xSteps);
+    for (let zIndex = 0; zIndex <= zSteps; zIndex += 1) {
+      const z = -width / 2 + width * (zIndex / zSteps);
+      points.push([x, 0, z]);
+    }
+  }
+  return points;
+}
+
 function estimateEnvironmentDetailScore(report: EnvironmentValidationReport): number {
   const thresholdEntries: Array<[number, number]> = [
     [report.curbCount, 60],
@@ -1096,15 +1135,30 @@ function createWaterFeature(path: TrackPath, track: TrackDefinition): THREE.Grou
   group.position.copy(pose.position);
   group.rotation.y = pose.yaw - Math.PI / 2;
 
-  const water = new THREE.Mesh(new THREE.BoxGeometry(168, 0.08, 76, 1, 1, 1), new THREE.MeshPhongMaterial({ color: 0x237f93, specular: 0x78dce8, shininess: 34 }));
-  water.position.set(0, -0.02, 0);
-  const seaWall = new THREE.Mesh(new THREE.BoxGeometry(174, 1.25, 1.2, 1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xd9e2e8 }));
-  seaWall.position.set(0, 0.58, 36.5);
-  const edgeStripe = new THREE.Mesh(new THREE.BoxGeometry(174, 0.08, 0.18, 1, 1, 1), new THREE.MeshBasicMaterial({ color: track.palette.accent }));
-  edgeStripe.position.set(0, 1.24, 35.82);
-  tagForValidation(water, 'water_feature', ['marina_identity', 'environment_density'], 1, { roadOverlapMode: 'exempt', validationRadius: 0 });
-  tagForValidation(seaWall, 'trackside_prop', ['marina_identity', 'track_edge'], 1, { validationRadius: 0.8 });
-  tagForValidation(edgeStripe, 'trackside_prop', ['marina_identity', 'track_edge'], 1, { validationRadius: 0.2 });
+  const waterLength = 90;
+  const waterWidth = 48;
+  const seaWallLength = 72;
+  const water = new THREE.Mesh(new THREE.BoxGeometry(waterLength, 0.08, waterWidth, 1, 1, 1), new THREE.MeshPhongMaterial({ color: 0x237f93, specular: 0x78dce8, shininess: 34 }));
+  water.name = 'marina-water-plane';
+  water.position.set(0, -0.02, -12);
+  const seaWall = new THREE.Mesh(new THREE.BoxGeometry(seaWallLength, 1.25, 1.2, 1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xd9e2e8 }));
+  seaWall.name = 'marina-sea-wall';
+  seaWall.position.set(0, 0.58, 12.8);
+  const edgeStripe = new THREE.Mesh(new THREE.BoxGeometry(seaWallLength, 0.08, 0.18, 1, 1, 1), new THREE.MeshBasicMaterial({ color: track.palette.accent }));
+  edgeStripe.name = 'marina-sea-wall-edge-stripe';
+  edgeStripe.position.set(0, 1.24, 12.1);
+  tagForValidation(water, 'water_feature', ['marina_identity', 'environment_density'], 1, {
+    validationRadius: 0,
+    validationProbeLocalPoints: createValidationProbeGrid(waterLength, waterWidth, 18, 6),
+  });
+  tagForValidation(seaWall, 'trackside_prop', ['marina_identity', 'track_edge'], 1, {
+    validationRadius: 0.8,
+    validationProbeLocalPoints: createValidationProbeGrid(seaWallLength, 1.2, 18, 1),
+  });
+  tagForValidation(edgeStripe, 'trackside_prop', ['marina_identity', 'track_edge'], 1, {
+    validationRadius: 0.2,
+    validationProbeLocalPoints: createValidationProbeGrid(seaWallLength, 0.18, 18, 1),
+  });
   group.add(water, seaWall, edgeStripe);
   group.userData.validationCount = 3;
   return group;

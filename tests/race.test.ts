@@ -43,6 +43,18 @@ function tagValidationTestObject(object: THREE.Object3D, category: EnvironmentCa
   object.userData.allowRoadOverlap = allowRoadOverlap;
 }
 
+function createValidationProbeGrid(length: number, width: number, xSteps: number, zSteps: number): Array<[number, number, number]> {
+  const points: Array<[number, number, number]> = [];
+  for (let xIndex = 0; xIndex <= xSteps; xIndex += 1) {
+    const x = -length / 2 + length * (xIndex / xSteps);
+    for (let zIndex = 0; zIndex <= zSteps; zIndex += 1) {
+      const z = -width / 2 + width * (zIndex / zSteps);
+      points.push([x, 0, z]);
+    }
+  }
+  return points;
+}
+
 function createFakeAudioContext(): AudioContext {
   const createAudioParam = () => ({
     value: 0,
@@ -199,6 +211,31 @@ describe('track data', () => {
       name: 'test-overlapping-guardrail',
       radius: 1,
     });
+  });
+
+  it('rejects long water-edge meshes that cross the road between center and endpoints', () => {
+    const marina = tracks.find((track) => track.id === 'marina')!;
+    const path = new TrackPath(marina);
+    const scene = new THREE.Scene();
+    const pose = path.poseAt(0.2, -78);
+    const group = new THREE.Group();
+    group.position.copy(pose.position);
+    group.rotation.y = pose.yaw - Math.PI / 2;
+
+    const oldSeaWallLength = 174;
+    const seaWall = new THREE.Mesh(new THREE.BoxGeometry(oldSeaWallLength, 1.25, 1.2), new THREE.MeshBasicMaterial());
+    seaWall.name = 'test-old-water-edge-sea-wall';
+    seaWall.position.set(0, 0.58, 36.5);
+    tagValidationTestObject(seaWall, 'trackside_prop', 0.8);
+    seaWall.userData.validationProbeLocalPoints = createValidationProbeGrid(oldSeaWallLength, 1.2, 24, 1);
+    group.add(seaWall);
+    scene.add(group);
+
+    const report = validateTrackEnvironment(scene, path, marina);
+
+    expect(report.roadObstructionCount).toBeGreaterThan(0);
+    expect(report.tracksidePropIntrusionCount).toBeGreaterThan(0);
+    expect(report.roadObstructions.some((obstruction) => obstruction.name.startsWith('test-old-water-edge-sea-wall@probe'))).toBe(true);
   });
 
   it('allows shallow curb edge overlap but rejects curbs placed deep inside the road', () => {
