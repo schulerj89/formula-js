@@ -23,7 +23,8 @@ Mobile-first Three.js formula racing game.
 - Bounded end-of-race replay playback from compact race-state samples with timed announcer/radio highlight calls.
 - Procedural menu, pre-race, podium, and finale music with no music during active racing.
 - Gear/rev-shaped formula engine audio with tire scrub, kerb/off-track thumps, and radio ducking metrics.
-- Announcer/radio speech hooks plus an ElevenLabs asset pipeline manifest.
+- Announcer/radio speech hooks plus optional ElevenLabs MP3 playback when generated assets exist.
+- Procedural music and browser speech fallbacks when ElevenLabs assets are missing or blocked.
 - Player garage paint swatches for body and helmet customization.
 - GPT-image reference art, Meshy preview GLBs, and a runtime loader for modular chassis, wheel, and driver assets.
 - Four procedural race circuits with red/white kerbs, trees, buildings, and landmarks.

@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { cpuRacers, playerTemplate } from '../src/data/racers';
 import { tracks } from '../src/data/tracks';
 import { musicThemes } from '../src/data/audio';
 import { formulaAssetManifest } from '../src/data/assets';
 import { bodyPaintOptions, helmetPaintOptions } from '../src/data/customization';
-import { analyzeRaceAudio } from '../src/game/audio';
+import { elevenLabsSongAssets, elevenLabsVoiceAssets, matchVoiceAsset } from '../src/data/elevenlabs';
+import { analyzeRaceAudio, RaceAudio } from '../src/game/audio';
 import { createRace } from '../src/game/race';
 import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
@@ -23,6 +24,30 @@ const settings: GameSettings = {
   bodyPaint: 'scarlet',
   helmetPaint: 'ivory',
 };
+
+function createFakeAudioContext(): AudioContext {
+  const createAudioParam = () => ({
+    value: 0,
+    setTargetAtTime: vi.fn(),
+    setValueAtTime: vi.fn(),
+    linearRampToValueAtTime: vi.fn(),
+    exponentialRampToValueAtTime: vi.fn(),
+  });
+  const createNode = () => ({
+    type: 'sine',
+    frequency: createAudioParam(),
+    gain: createAudioParam(),
+    connect: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+  });
+  return {
+    currentTime: 0,
+    destination: {},
+    createGain: createNode,
+    createOscillator: createNode,
+  } as unknown as AudioContext;
+}
 
 describe('track data', () => {
   it('defines four closed race tracks with kerb zones and landmarks', () => {
@@ -60,6 +85,16 @@ describe('audio data', () => {
     }
   });
 
+  it('maps ElevenLabs runtime assets to non-race music cues and key voice lines', () => {
+    expect(elevenLabsSongAssets.map((asset) => asset.cue).sort()).toEqual(['finale', 'menu', 'podium', 'prerace']);
+    expect(elevenLabsVoiceAssets).toHaveLength(3);
+    expect(
+      matchVoiceAsset('Arthur Bell', 'Silverpine Switchback looks magnificent today: fast entries, dangerous exits, and very honest kerbs.')?.id,
+    ).toBe('arthur-prerace');
+    expect(matchVoiceAsset('Mags Whitlow', 'Five red lights, then it is noise, nerves, and no excuses.')?.id).toBe('mags-lights');
+    expect(matchVoiceAsset('Radio', 'Damage is climbing. Stay off the outside kerbs and bring it home.')?.id).toBe('radio-damage');
+  });
+
   it('maps race state into gear, rev, tire, and kerb audio feedback', () => {
     const calm = analyzeRaceAudio({ speed: 18, lateral: 0.5, damage: 1 }, { throttle: true, brake: false, steer: 0.1 });
     const loaded = analyzeRaceAudio({ speed: 58, lateral: 5.6, damage: 0.8 }, { throttle: true, brake: true, steer: 0.9 });
@@ -69,6 +104,79 @@ describe('audio data', () => {
     expect(loaded.tireLoad).toBeGreaterThan(calm.tireLoad);
     expect(loaded.kerbLoad).toBeGreaterThan(calm.kerbLoad);
     expect(loaded.offTrackLoad).toBeGreaterThan(0);
+  });
+
+  it('falls back to procedural music after generated song playback rejects', async () => {
+    const audio = new RaceAudio({ ...settings, mute: false });
+    const menuTheme = musicThemes.menu;
+    const generatedSong = {
+      dataset: { assetId: 'menu-gridline-spark' },
+      currentTime: 0,
+      pause: vi.fn(),
+      play: vi.fn(() => Promise.reject(new Error('blocked'))),
+    } as unknown as HTMLAudioElement;
+    const internals = audio as unknown as {
+      context: AudioContext;
+      loadedSongs: Map<string, HTMLAudioElement>;
+    };
+    internals.context = createFakeAudioContext();
+    internals.loadedSongs.set('menu', generatedSong);
+
+    audio.playMusic(menuTheme, 1);
+    await Promise.resolve();
+    await Promise.resolve();
+    audio.playMusic(menuTheme, 1);
+
+    const metrics = audio.metrics();
+    expect(metrics.assets.assetErrors).toBe(1);
+    expect(metrics.assets.generatedMusicEvents).toBe(0);
+    expect(metrics.assets.activeGeneratedMusic).toBeNull();
+    expect(metrics.assets.fallbackMusicEvents).toBeGreaterThan(0);
+  });
+
+  it('falls back to browser speech after generated voice playback rejects', async () => {
+    const speak = vi.fn();
+    const cancel = vi.fn();
+    class FakeSpeechSynthesisUtterance {
+      rate = 1;
+      pitch = 1;
+      volume = 1;
+      voice?: SpeechSynthesisVoice;
+
+      constructor(readonly text: string) {}
+    }
+    vi.stubGlobal('window', {
+      speechSynthesis: {
+        cancel,
+        getVoices: () => [],
+        speak,
+      },
+    });
+    vi.stubGlobal('SpeechSynthesisUtterance', FakeSpeechSynthesisUtterance);
+    try {
+      const audio = new RaceAudio({ ...settings, mute: false });
+      const generatedVoice = {
+        currentTime: 0,
+        play: vi.fn(() => Promise.reject(new Error('decode failed'))),
+      } as unknown as HTMLAudioElement;
+      const internals = audio as unknown as {
+        loadedVoices: Map<string, HTMLAudioElement>;
+      };
+      internals.loadedVoices.set('mags-lights', generatedVoice);
+
+      audio.speak('Mags Whitlow', 'Five red lights, then it is noise, nerves, and no excuses.');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const metrics = audio.metrics();
+      expect(metrics.assets.assetErrors).toBe(1);
+      expect(metrics.assets.generatedSpeechEvents).toBe(0);
+      expect(metrics.assets.fallbackSpeechEvents).toBe(1);
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(speak).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

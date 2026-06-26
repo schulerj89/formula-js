@@ -1,5 +1,6 @@
 import type { GameSettings } from '../types';
 import { announcerVoiceProfiles, type MusicCueId, type MusicTheme } from '../data/audio';
+import { elevenLabsSongAssets, elevenLabsVoiceAssets, matchVoiceAsset } from '../data/elevenlabs';
 import type { RaceControl, RaceSnapshot } from './race';
 
 export interface RaceAudioFeedback {
@@ -36,6 +37,16 @@ export class RaceAudio {
   private lastGear = 1;
   private lastDamage = 1;
   private raceFeedback: RaceAudioFeedback = defaultFeedback();
+  private assetWarmupStarted = false;
+  private loadedSongs = new Map<MusicCueId, HTMLAudioElement>();
+  private loadedVoices = new Map<string, HTMLAudioElement>();
+  private missingAssets = new Set<string>();
+  private disabledAssets = new Set<string>();
+  private currentSongElement: HTMLAudioElement | null = null;
+  private activeGeneratedMusicId: string | null = null;
+  private generatedMusicEvents = 0;
+  private generatedSpeechEvents = 0;
+  private assetErrors = 0;
 
   constructor(private readonly settings: GameSettings) {}
 
@@ -43,6 +54,7 @@ export class RaceAudio {
     if (this.settings.mute) return;
     this.context ??= new AudioContext();
     void this.context.resume();
+    this.warmupAssets();
   }
 
   setEngine(speed: number): void {
@@ -116,6 +128,12 @@ export class RaceAudio {
     this.currentMusic = null;
     this.activeMusicTitle = 'Silent';
     this.musicTimer = 0;
+    if (this.currentSongElement) {
+      this.currentSongElement.pause();
+      this.currentSongElement.currentTime = 0;
+      this.currentSongElement = null;
+      this.activeGeneratedMusicId = null;
+    }
   }
 
   beep(count: number): void {
@@ -142,7 +160,10 @@ export class RaceAudio {
       this.activeMusicTitle = theme.title;
       this.musicTimer = 0;
       this.musicStep = 0;
+      if (this.playGeneratedSong(theme)) return;
     }
+    if (!this.currentSongElement && this.loadedSongs.has(theme.id) && this.playGeneratedSong(theme)) return;
+    if (this.currentSongElement) return;
     this.musicTimer -= dt;
     if (this.musicTimer > 0) return;
     const stepSeconds = 60 / theme.bpm / 2;
@@ -167,7 +188,12 @@ export class RaceAudio {
       this.engineGain?.gain.setTargetAtTime(Math.max(0.012, this.raceFeedback.engineGain * 0.45), this.context?.currentTime ?? 0, 0.025);
       this.engineHarmonicGain?.gain.setTargetAtTime(0.004, this.context?.currentTime ?? 0, 0.025);
     }
-    if (!this.speechEnabled || !('SpeechSynthesisUtterance' in window)) return;
+    if (this.playGeneratedVoice(speaker, text)) return;
+    this.speakWithBrowser(speaker, text);
+  }
+
+  private speakWithBrowser(speaker: string, text: string): void {
+    if (!this.speechEnabled || typeof window === 'undefined' || typeof SpeechSynthesisUtterance === 'undefined') return;
     const utterance = new SpeechSynthesisUtterance(text);
     const profile = announcerVoiceProfiles[speaker as keyof typeof announcerVoiceProfiles] ?? announcerVoiceProfiles['Arthur Bell'];
     utterance.rate = profile.rate;
@@ -187,6 +213,17 @@ export class RaceAudio {
     speechEnabled: boolean;
     speechEvents: number;
     lastSpeaker: string;
+    assets: {
+      generatedMusicReady: number;
+      generatedVoiceReady: number;
+      missingAssets: number;
+      generatedMusicEvents: number;
+      generatedSpeechEvents: number;
+      fallbackMusicEvents: number;
+      fallbackSpeechEvents: number;
+      assetErrors: number;
+      activeGeneratedMusic: string | null;
+    };
     race: RaceAudioFeedback & {
       tireScrubEvents: number;
       impactEvents: number;
@@ -201,6 +238,17 @@ export class RaceAudio {
       speechEnabled: this.speechEnabled,
       speechEvents: this.speechEvents,
       lastSpeaker: this.lastSpeaker,
+      assets: {
+        generatedMusicReady: this.loadedSongs.size,
+        generatedVoiceReady: this.loadedVoices.size,
+        missingAssets: this.missingAssets.size,
+        generatedMusicEvents: this.generatedMusicEvents,
+        generatedSpeechEvents: this.generatedSpeechEvents,
+        fallbackMusicEvents: this.musicEvents,
+        fallbackSpeechEvents: this.speechEvents,
+        assetErrors: this.assetErrors,
+        activeGeneratedMusic: this.activeGeneratedMusicId,
+      },
       race: {
         ...this.raceFeedback,
         tireScrubEvents: this.tireScrubEvents,
@@ -241,6 +289,100 @@ export class RaceAudio {
     this.playTone(frequency, duration, kind === 'hat' ? 'square' : 'triangle', volume);
   }
 
+  private warmupAssets(): void {
+    if (this.assetWarmupStarted || typeof Audio === 'undefined') return;
+    this.assetWarmupStarted = true;
+    elevenLabsSongAssets.forEach((asset) => {
+      void this.prepareAudioElement(asset.src, asset.id, true).then((element) => {
+        if (element) this.loadedSongs.set(asset.cue, element);
+      });
+    });
+    elevenLabsVoiceAssets.forEach((asset) => {
+      void this.prepareAudioElement(asset.src, asset.id, false).then((element) => {
+        if (element) this.loadedVoices.set(asset.id, element);
+      });
+    });
+  }
+
+  private async prepareAudioElement(src: string, assetId: string, loop: boolean): Promise<HTMLAudioElement | null> {
+    try {
+      const response = await fetch(resolvePublicAssetUrl(src), { method: 'HEAD' });
+      if (!response.ok) {
+        this.missingAssets.add(assetId);
+        return null;
+      }
+      const audio = new Audio(resolvePublicAssetUrl(src));
+      audio.dataset.assetId = assetId;
+      audio.preload = 'auto';
+      audio.loop = loop;
+      audio.volume = loop ? 0.32 : 0.86;
+      const ready = await waitForAudioReady(audio);
+      if (!ready) {
+        this.assetErrors += 1;
+        this.disabledAssets.add(assetId);
+        return null;
+      }
+      return audio;
+    } catch {
+      this.assetErrors += 1;
+      this.missingAssets.add(assetId);
+      return null;
+    }
+  }
+
+  private playGeneratedSong(theme: MusicTheme): boolean {
+    const song = this.loadedSongs.get(theme.id);
+    if (!song || this.disabledAssets.has(song.dataset.assetId ?? theme.id)) {
+      if (this.currentSongElement) {
+        this.currentSongElement.pause();
+        this.currentSongElement = null;
+        this.activeGeneratedMusicId = null;
+      }
+      return false;
+    }
+    if (this.currentSongElement === song) {
+      return true;
+    }
+    if (this.currentSongElement && this.currentSongElement !== song) {
+      this.currentSongElement.pause();
+      this.currentSongElement.currentTime = 0;
+    }
+    this.currentSongElement = song;
+    this.activeGeneratedMusicId = null;
+    song.currentTime = 0;
+    void song
+      .play()
+      .then(() => {
+        if (this.currentSongElement === song) this.activeGeneratedMusicId = song.dataset.assetId ?? theme.id;
+        this.generatedMusicEvents += 1;
+      })
+      .catch(() => {
+        this.disabledAssets.add(song.dataset.assetId ?? theme.id);
+        this.assetErrors += 1;
+        if (this.currentSongElement === song) {
+          this.currentSongElement = null;
+          this.activeGeneratedMusicId = null;
+        }
+      });
+    return true;
+  }
+
+  private playGeneratedVoice(speaker: string, text: string): boolean {
+    const asset = matchVoiceAsset(speaker, text);
+    if (!asset || this.disabledAssets.has(asset.id)) return false;
+    const voice = this.loadedVoices.get(asset.id);
+    if (!voice) return false;
+    voice.currentTime = 0;
+    void voice.play().then(() => {
+      this.generatedSpeechEvents += 1;
+    }).catch(() => {
+      this.disabledAssets.add(asset.id);
+      this.assetErrors += 1;
+      this.speakWithBrowser(speaker, text);
+    });
+    return true;
+  }
+
   private playNoise(duration: number, volume: number, filterFrequency: number): void {
     if (!this.context || this.settings.mute) return;
     const sampleRate = this.context.sampleRate;
@@ -266,6 +408,34 @@ export class RaceAudio {
 }
 
 const ratio = (semitones: number): number => 2 ** (semitones / 12);
+
+function resolvePublicAssetUrl(url: string): string {
+  if (!url.startsWith('/')) return url;
+  return new URL(url.slice(1), document.baseURI).toString();
+}
+
+function waitForAudioReady(audio: HTMLAudioElement): Promise<boolean> {
+  if (audio.readyState >= 2) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (ready: boolean): void => {
+      if (settled) return;
+      settled = true;
+      audio.removeEventListener('canplaythrough', onReady);
+      audio.removeEventListener('loadeddata', onReady);
+      audio.removeEventListener('error', onError);
+      window.clearTimeout(timeout);
+      resolve(ready);
+    };
+    const onReady = (): void => done(true);
+    const onError = (): void => done(false);
+    const timeout = window.setTimeout(() => done(false), 2500);
+    audio.addEventListener('canplaythrough', onReady, { once: true });
+    audio.addEventListener('loadeddata', onReady, { once: true });
+    audio.addEventListener('error', onError, { once: true });
+    audio.load();
+  });
+}
 
 export function analyzeRaceAudio(
   player: Pick<RaceSnapshot['player'], 'speed' | 'lateral' | 'damage'>,

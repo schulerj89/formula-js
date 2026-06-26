@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0 - 2026-06-26
+
+- Added optional runtime playback for planned ElevenLabs MP3 music and voice assets.
+- Preserved procedural WebAudio music and browser speech synthesis as fallbacks when generated files are absent.
+- Added debug metrics for generated audio readiness, missing assets, playback events, and asset errors.
+- Added unit and browser smoke coverage for the ElevenLabs runtime asset registry.
+
 ## 1.0.0 - 2026-06-26
 
 - Added a world-space podium ceremony with three staged platforms, light rigs, and confetti.

@@ -44,6 +44,11 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.audio.race.tireScrubEvents).toBeLessThan(40);
   expect(metrics.audio.race.kerbEvents).toBeLessThan(30);
   expect(metrics.audio.race.radioDucks).toBeGreaterThanOrEqual(0);
+  expect(metrics.audio.assets.generatedMusicReady).toBeGreaterThanOrEqual(0);
+  expect(metrics.audio.assets.generatedVoiceReady).toBeGreaterThanOrEqual(0);
+  expect(metrics.audio.assets.missingAssets).toBeGreaterThanOrEqual(0);
+  expect(metrics.audio.assets.fallbackMusicEvents).toBeGreaterThanOrEqual(0);
+  expect(metrics.audio.assets.assetErrors).toBeGreaterThanOrEqual(0);
   expect(metrics.sceneDetails.barrierPanels).toBe(320);
   expect(metrics.sceneDetails.sponsorBoards).toBe(72);
   expect(metrics.sceneDetails.tireStacks).toBeGreaterThan(40);
