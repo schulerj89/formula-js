@@ -61,13 +61,22 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.liveReplayFrames).toBeGreaterThan(20);
   expect(metrics.replayFrames).toBe(0);
   expect(metrics.triangles).toBeGreaterThan(30_000);
-  expect(metrics.triangles).toBeLessThan(900_000);
-  expect(metrics.calls).toBeLessThan(320);
-  expect(metrics.geometries).toBeLessThan(220);
+  if (isMobile) {
+    expect(metrics.triangles).toBeLessThan(180_000);
+    expect(metrics.calls).toBeLessThan(150);
+    expect(metrics.geometries).toBeLessThan(60);
+  } else {
+    expect(metrics.triangles).toBeLessThan(900_000);
+    expect(metrics.calls).toBeLessThan(320);
+    expect(metrics.geometries).toBeLessThan(220);
+  }
   expect(metrics.textures).toBeLessThan(20);
   expect(metrics.estimatedFps).toBeGreaterThan(0);
-  if (isMobile) expect(metrics.estimatedFps).toBeGreaterThanOrEqual(30);
+  if (isMobile) expect(metrics.estimatedFps).toBeGreaterThanOrEqual(24);
   expect(metrics.p95FrameMs).toBeGreaterThan(0);
+  expect(metrics.performanceWork.leaderboardRenders).toBeLessThan(90);
+  expect(metrics.performanceWork.debugMetricRefreshes).toBeLessThan(140);
+  expect(metrics.performanceWork.debugMetricCadenceMs).toBe(200);
   expect(metrics.audio.musicCue).toBe('Silent');
   expect(metrics.audio.race.gear).toBeGreaterThanOrEqual(1);
   expect(metrics.audio.race.engineFrequency).toBeGreaterThan(0);

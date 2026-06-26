@@ -123,6 +123,7 @@ function createGeneratedFormulaCar(kit: LoadedFormulaKit, color: number, helmet:
     wheel.position.set(x, y, z);
     group.add(wheel);
   }
+  group.userData.wheels = group.children.filter((child) => child.name === 'separate-wheel');
 
   const driver = cloneRenderable(kit.driver);
   driver.name = 'generated-driver-suit';

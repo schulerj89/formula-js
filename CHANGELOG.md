@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.14.0 - 2026-06-26
+
+- Reduced active-race per-frame churn by caching car wheel references and avoiding repeated child scans.
+- Avoided redundant HUD, leaderboard, and track-map DOM writes during race updates.
+- Throttled expensive debug metric sorting to a fixed cadence while keeping the test hook live.
+- Tightened mobile balanced smoke gates back to the documented calls, triangle, and geometry hard budgets.
+
 ## 1.13.0 - 2026-06-26
 
 - Added an ElevenLabs asset verification script that checks manifest statuses, duplicate IDs, and generated MP3 presence.

@@ -76,6 +76,7 @@ export function createFormulaCar(color: number, helmet: number): THREE.Group {
     group.add(wheel);
   }
 
+  group.userData.wheels = group.children.filter((child) => child.name === 'separate-wheel');
   group.scale.setScalar(0.86);
   return group;
 }

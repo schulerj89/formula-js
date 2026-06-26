@@ -301,6 +301,12 @@ describe('customization and asset pipeline data', () => {
     expect(leftArm.rotation.z).not.toBe(idleArmRotation);
     expect(car.getObjectByName('customizable-helmet')).toBeTruthy();
   });
+
+  it('caches wheel references for active-race animation without child scans', () => {
+    const car = createFormulaCar(0xe53935, 0xffd166);
+    expect(car.userData.wheels).toHaveLength(4);
+    expect(car.userData.wheels.every((wheel: { name: string }) => wheel.name === 'separate-wheel')).toBe(true);
+  });
 });
 
 describe('race simulation', () => {

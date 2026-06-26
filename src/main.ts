@@ -100,6 +100,15 @@ let brakeUrgency: 'clear' | 'soon' | 'now' = 'clear';
 let captionQueue: Array<{ speaker: string; text: string; duration: number }> = [];
 let captionQueueDelivered = 0;
 let captionQueueSpeakers: string[] = [];
+let cachedDebugMetrics: ReturnType<typeof buildDebugMetrics> | null = null;
+let debugMetricTimer = 0;
+let debugMetricRefreshes = 0;
+let hudDomWrites = 0;
+let leaderboardRenderCount = 0;
+let trackMapDomWrites = 0;
+let lastDamageScale = '';
+let lastTireScale = '';
+let lastLeaderboardHtml = '';
 const frameTimes: number[] = [];
 let frameTimeWindow = 0;
 const roadParkingBase = 17;
@@ -268,6 +277,12 @@ const trackMapDots = root.querySelector<SVGGElement>('#trackMapDots')!;
 const gapAhead = root.querySelector<HTMLElement>('#gapAhead')!;
 const gapBehind = root.querySelector<HTMLElement>('#gapBehind')!;
 const raceHint = root.querySelector<HTMLElement>('#raceHint')!;
+const placeValue = root.querySelector<HTMLElement>('#place')!;
+const lapValue = root.querySelector<HTMLElement>('#lap')!;
+const speedValue = root.querySelector<HTMLElement>('#speed')!;
+const damageBar = root.querySelector<HTMLElement>('#damageBar')!;
+const tireBar = root.querySelector<HTMLElement>('#tireBar')!;
+const leaderboardList = leaderboard.querySelector<HTMLOListElement>('ol')!;
 const trackMapDotElements = new Map<string, SVGCircleElement>();
 
 initUi();
@@ -461,7 +476,7 @@ function update(dt: number): void {
   if (captionTimer <= 0) {
     if (!showNextQueuedCaption() && (gameState === 'menu' || gameState === 'race')) rotateCaption();
   }
-  exposeDebug();
+  exposeDebug(dt);
 }
 
 function showSetup(): void {
@@ -624,6 +639,7 @@ function updatePodiumCamera(dt: number, finale: boolean): void {
 
 function updateCars(snapshot: RaceSnapshot): void {
   if (!sceneBuild) return;
+  const elapsed = performance.now() * 0.001;
   for (const state of snapshot.racers) {
     const car = sceneBuild.cars.get(state.definition.id);
     if (!car) continue;
@@ -631,26 +647,64 @@ function updateCars(snapshot: RaceSnapshot): void {
     car.position.copy(pose.position);
     car.position.y = 0.2;
     car.rotation.y = pose.yaw - state.lateral * 0.015;
-    animateDriverIdle(car, performance.now() * 0.001);
-    const wheelSpin = state.speed * performance.now() * 0.0006;
-    car.children.filter((child) => child.name === 'separate-wheel').forEach((wheel) => {
+    animateDriverIdle(car, elapsed);
+    const wheelSpin = state.speed * elapsed * 0.6;
+    cachedCarWheels(car).forEach((wheel) => {
       wheel.rotation.x = wheelSpin;
     });
   }
 }
 
+function cachedCarWheels(car: THREE.Group): THREE.Object3D[] {
+  const cached = car.userData.wheels;
+  if (Array.isArray(cached)) return cached as THREE.Object3D[];
+  const wheels = car.children.filter((child) => child.name === 'separate-wheel');
+  car.userData.wheels = wheels;
+  return wheels;
+}
+
 function updateHud(snapshot: RaceSnapshot): void {
   const totalLaps = mode === 'timeAttack' ? 1 : selectedTrack.laps;
   const visibleLap = snapshot.player.finished ? totalLaps : Math.min(totalLaps, snapshot.player.lap + 1);
-  root.querySelector('#place')!.textContent = `${snapshot.position}/8`;
-  root.querySelector('#lap')!.textContent = `${visibleLap}/${totalLaps}`;
-  root.querySelector('#speed')!.textContent = `${Math.round(snapshot.player.speed * 3.6)}`;
-  root.querySelector<HTMLElement>('#damageBar')!.style.transform = `scaleX(${snapshot.player.damage})`;
-  root.querySelector<HTMLElement>('#tireBar')!.style.transform = `scaleX(${snapshot.player.tires})`;
+  setTextIfChanged(placeValue, `${snapshot.position}/8`);
+  setTextIfChanged(lapValue, `${visibleLap}/${totalLaps}`);
+  setTextIfChanged(speedValue, `${Math.round(snapshot.player.speed * 3.6)}`);
+  setScaleIfChanged(damageBar, 'damage', snapshot.player.damage);
+  setScaleIfChanged(tireBar, 'tires', snapshot.player.tires);
   updateTrackMap(snapshot);
   leaderboard.classList.toggle('active', settings.leaderboard);
-  const list = leaderboard.querySelector('ol')!;
-  list.innerHTML = snapshot.standings.map((racer) => `<li>${racer.definition.shortName} / L${visibleRacerLap(racer)}</li>`).join('');
+  const leaderboardHtml = snapshot.standings.map((racer) => `<li>${racer.definition.shortName} / L${visibleRacerLap(racer)}</li>`).join('');
+  if (leaderboardHtml !== lastLeaderboardHtml) {
+    leaderboardList.innerHTML = leaderboardHtml;
+    lastLeaderboardHtml = leaderboardHtml;
+    leaderboardRenderCount += 1;
+    hudDomWrites += 1;
+  }
+}
+
+function setTextIfChanged(element: HTMLElement, value: string): void {
+  if (element.textContent === value) return;
+  element.textContent = value;
+  hudDomWrites += 1;
+}
+
+function setScaleIfChanged(element: HTMLElement, kind: 'damage' | 'tires', value: number): void {
+  const scale = `${Math.max(0, Math.min(1, value)).toFixed(3)}`;
+  if (kind === 'damage') {
+    if (scale === lastDamageScale) return;
+    lastDamageScale = scale;
+  } else {
+    if (scale === lastTireScale) return;
+    lastTireScale = scale;
+  }
+  element.style.transform = `scaleX(${scale})`;
+  hudDomWrites += 1;
+}
+
+function setSvgAttrIfChanged(element: SVGElement, name: string, value: string): void {
+  if (element.getAttribute(name) === value) return;
+  element.setAttribute(name, value);
+  trackMapDomWrites += 1;
 }
 
 function renderTrackMapRoute(): void {
@@ -690,28 +744,21 @@ function clearTrackMap(): void {
 function updateTrackMap(snapshot: RaceSnapshot): void {
   if (!sceneBuild || !trackMapLayout) renderTrackMapRoute();
   if (!sceneBuild || !trackMapLayout) return;
-  const activeIds = new Set<string>();
   for (const racer of snapshot.racers) {
-    activeIds.add(racer.definition.id);
     let dot = trackMapDotElements.get(racer.definition.id);
     if (!dot) {
       dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       dot.dataset.racerId = racer.definition.id;
+      dot.setAttribute('r', racer.definition.id === 'player' ? '4.8' : '3.2');
+      dot.setAttribute('class', `track-dot ${racer.definition.id === 'player' ? 'player' : ''}`);
       trackMapDots.append(dot);
       trackMapDotElements.set(racer.definition.id, dot);
+      trackMapDomWrites += 3;
     }
     const pose = sceneBuild.path.poseAt(racer.progress, 0);
     const point = trackMapLayout.project(pose.position.x, pose.position.z);
-    dot.setAttribute('cx', `${point.x}`);
-    dot.setAttribute('cy', `${point.y}`);
-    dot.setAttribute('r', racer.definition.id === 'player' ? '4.8' : '3.2');
-    dot.setAttribute('class', `track-dot ${racer.definition.id === 'player' ? 'player' : ''}`);
-  }
-  for (const [id, dot] of trackMapDotElements) {
-    if (!activeIds.has(id)) {
-      dot.remove();
-      trackMapDotElements.delete(id);
-    }
+    setSvgAttrIfChanged(dot, 'cx', point.x.toFixed(1));
+    setSvgAttrIfChanged(dot, 'cy', point.y.toFixed(1));
   }
   trackMapDotCount = trackMapDotElements.size;
   const summary = summarizeRaceReadability(snapshot, selectedTrack);
@@ -722,18 +769,29 @@ function updateTrackMap(snapshot: RaceSnapshot): void {
   readoutSideBySide = summary.sideBySide ? `${summary.sideBySide.shortName} ${summary.sideBySide.side}` : null;
   nextBrakeMeters = summary.nextBrakeMeters;
   brakeUrgency = summary.brakeUrgency;
-  gapAhead.textContent = summary.nearestAhead
-    ? `Up ${summary.nearestAhead.shortName} ${formatMeters(summary.nearestAhead.meters)}${summary.nearestAhead.closing ? ' +' : ''}`
-    : 'Up clear';
-  gapBehind.textContent = summary.nearestBehind
-    ? `Back ${summary.nearestBehind.shortName} ${formatMeters(summary.nearestBehind.meters)}${summary.nearestBehind.closing ? ' +' : ''}`
-    : 'Back clear';
-  raceHint.textContent = summary.sideBySide
-    ? `Side ${summary.sideBySide.shortName} ${summary.sideBySide.side}`
-    : summary.nextBrakeMeters !== null
-      ? `${summary.brakeUrgency === 'now' ? 'Brake now' : 'Brake'} ${formatMeters(summary.nextBrakeMeters)}`
-      : 'Brake clear';
-  raceHint.className = summary.sideBySide ? 'danger' : summary.brakeUrgency;
+  setTextIfChanged(
+    gapAhead,
+    summary.nearestAhead ? `Up ${summary.nearestAhead.shortName} ${formatMeters(summary.nearestAhead.meters)}${summary.nearestAhead.closing ? ' +' : ''}` : 'Up clear',
+  );
+  setTextIfChanged(
+    gapBehind,
+    summary.nearestBehind
+      ? `Back ${summary.nearestBehind.shortName} ${formatMeters(summary.nearestBehind.meters)}${summary.nearestBehind.closing ? ' +' : ''}`
+      : 'Back clear',
+  );
+  setTextIfChanged(
+    raceHint,
+    summary.sideBySide
+      ? `Side ${summary.sideBySide.shortName} ${summary.sideBySide.side}`
+      : summary.nextBrakeMeters !== null
+        ? `${summary.brakeUrgency === 'now' ? 'Brake now' : 'Brake'} ${formatMeters(summary.nextBrakeMeters)}`
+        : 'Brake clear',
+  );
+  const hintClass = summary.sideBySide ? 'danger' : summary.brakeUrgency;
+  if (raceHint.className !== hintClass) {
+    raceHint.className = hintClass;
+    hudDomWrites += 1;
+  }
 }
 
 function updateRaceAnnouncements(snapshot: RaceSnapshot, force = false): void {
@@ -1226,14 +1284,45 @@ function targetPixelRatio(): number {
   return Math.min(window.devicePixelRatio, mobile ? 1 : 1.3);
 }
 
-function exposeDebug(): void {
+function exposeDebug(dt = 0): void {
+  debugMetricTimer -= dt;
+  if (!cachedDebugMetrics || debugMetricTimer <= 0) {
+    debugMetricRefreshes += 1;
+    cachedDebugMetrics = buildDebugMetrics();
+    debugMetricTimer = 0.2;
+  }
+  const metrics = cachedDebugMetrics;
+  const debugText = `calls ${metrics.calls}\ntris ${metrics.triangles}\ngeos ${metrics.geometries}\ntex ${metrics.textures}\nfps ${metrics.estimatedFps}\nreplay ${metrics.replayFrames}`;
+  if (debug.textContent !== debugText) debug.textContent = debugText;
+  debug.classList.toggle('active', debugOverlayEnabled());
+  (window as any).__GRIDLINE_APEX__ = {
+    ready: true,
+    state: gameState,
+    metrics,
+    settings,
+    results,
+    campaignScores,
+    replay: lastReplay,
+    debug: {
+      forcePodium: forcePodiumForSmoke,
+      forceContact: forceContactForSmoke,
+      forcePositionGain: forcePositionGainForSmoke,
+      forceSideThreat: forceSideThreatForSmoke,
+      forceAnnouncementConflict: forceAnnouncementConflictForSmoke,
+      forceRaceFinish: finishCampaignRaceForSmoke,
+      finishCampaignRace: finishCampaignRaceForSmoke,
+    },
+  };
+}
+
+function buildDebugMetrics() {
   const sortedFrameTimes = [...frameTimes].sort((a, b) => a - b);
   const p50 = percentile(sortedFrameTimes, 0.5);
   const p95 = percentile(sortedFrameTimes, 0.95);
   const worst = sortedFrameTimes[sortedFrameTimes.length - 1] ?? 0;
   const fps = p50 > 0 ? 1 / p50 : 0;
   const cpuRacecraft = summarizeCpuRacecraft(latestSnapshot);
-  const metrics = {
+  return {
     calls: renderer.info.render.calls,
     triangles: renderer.info.render.triangles,
     points: renderer.info.render.points,
@@ -1247,6 +1336,13 @@ function exposeDebug(): void {
     pixelRatio: renderer.getPixelRatio(),
     viewport: { width: window.innerWidth, height: window.innerHeight },
     performanceMode: settings.performanceMode,
+    performanceWork: {
+      hudDomWrites,
+      leaderboardRenders: leaderboardRenderCount,
+      trackMapDomWrites,
+      debugMetricRefreshes,
+      debugMetricCadenceMs: 200,
+    },
     state: gameState,
     track: selectedTrack.id,
     previewTrack: menuPreviewTrack.id,
@@ -1335,26 +1431,6 @@ function exposeDebug(): void {
     audio: audio.metrics(),
     assetKit: formulaAssetManifest,
     assetStatus: formulaAssets.metrics(),
-  };
-  debug.textContent = `calls ${metrics.calls}\ntris ${metrics.triangles}\ngeos ${metrics.geometries}\ntex ${metrics.textures}\nfps ${metrics.estimatedFps}\nreplay ${metrics.replayFrames}`;
-  debug.classList.toggle('active', debugOverlayEnabled());
-  (window as any).__GRIDLINE_APEX__ = {
-    ready: true,
-    state: gameState,
-    metrics,
-    settings,
-    results,
-    campaignScores,
-    replay: lastReplay,
-    debug: {
-      forcePodium: forcePodiumForSmoke,
-      forceContact: forceContactForSmoke,
-      forcePositionGain: forcePositionGainForSmoke,
-      forceSideThreat: forceSideThreatForSmoke,
-      forceAnnouncementConflict: forceAnnouncementConflictForSmoke,
-      forceRaceFinish: finishCampaignRaceForSmoke,
-      finishCampaignRace: finishCampaignRaceForSmoke,
-    },
   };
 }
 
