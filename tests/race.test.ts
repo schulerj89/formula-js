@@ -259,6 +259,10 @@ describe('audio data', () => {
     for (const manifestAsset of elevenLabsManifest.voiceLines) {
       const runtimeAsset = elevenLabsVoiceAssets.find((asset) => asset.id === manifestAsset.id);
       expect(runtimeAsset?.src).toBe(manifestAsset.file.replace(/^public/, ''));
+      expect(manifestAsset.lineIds).toEqual(runtimeAsset?.lineIds);
+      for (const lineId of manifestAsset.lineIds) {
+        expect(matchVoiceAsset(manifestAsset.speaker, 'Changed text still follows the planned line identity.', lineId)?.id).toBe(manifestAsset.id);
+      }
       expect(matchVoiceAsset(manifestAsset.speaker, manifestAsset.text.replace('{track}', 'Silverpine Switchback'))?.id).toBe(manifestAsset.id);
     }
     for (const manifestAsset of elevenLabsManifest.songs) {

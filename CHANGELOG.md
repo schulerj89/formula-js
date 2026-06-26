@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.29.4 - 2026-06-26
+
+- Added stable `lineIds` to the ElevenLabs voice generation plan and checked manifest.
+- Expanded audio verification and unit coverage so planned voice assets, runtime line IDs, and generated-voice matching stay aligned.
+
 ## 1.29.3 - 2026-06-26
 
 - Added optional line-ID matching for generated voice assets while preserving exact speaker/text fallback matching.

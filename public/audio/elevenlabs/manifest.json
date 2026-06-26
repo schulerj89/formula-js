@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-26T10:46:17.436Z",
+  "generatedAt": "2026-06-26T12:20:34.249Z",
   "dryRun": true,
   "sources": {
     "tts": "https://api.elevenlabs.io/v1/text-to-speech/:voice_id",
@@ -10,6 +10,9 @@
       "id": "arthur-prerace",
       "speaker": "Arthur Bell",
       "voiceEnv": "ELEVENLABS_ARTHUR_VOICE_ID",
+      "lineIds": [
+        "arthur.prerace.generic"
+      ],
       "text": "{track} looks magnificent today: fast entries, dangerous exits, and very honest kerbs.",
       "file": "public/audio/elevenlabs/arthur-prerace.mp3",
       "status": "planned"
@@ -18,6 +21,9 @@
       "id": "arthur-prerace-silverpine-track",
       "speaker": "Arthur Bell",
       "voiceEnv": "ELEVENLABS_ARTHUR_VOICE_ID",
+      "lineIds": [
+        "arthur.prerace.silverpine.track"
+      ],
       "text": "Silverpine Switchback asks for patience through the trees: quick entries, late exits, and no argument with the kerbs.",
       "file": "public/audio/elevenlabs/arthur-prerace-silverpine-track.mp3",
       "status": "planned"
@@ -26,6 +32,9 @@
       "id": "arthur-prerace-marina-track",
       "speaker": "Arthur Bell",
       "voiceEnv": "ELEVENLABS_ARTHUR_VOICE_ID",
+      "lineIds": [
+        "arthur.prerace.marina.track"
+      ],
       "text": "Marina Vista Circuit is narrow, polished, and unforgiving from the harbour tunnel to the sea wall stand.",
       "file": "public/audio/elevenlabs/arthur-prerace-marina-track.mp3",
       "status": "planned"
@@ -34,6 +43,9 @@
       "id": "arthur-prerace-neon-track",
       "speaker": "Arthur Bell",
       "voiceEnv": "ELEVENLABS_ARTHUR_VOICE_ID",
+      "lineIds": [
+        "arthur.prerace.neon.track"
+      ],
       "text": "Neon Borough GP is all braking references and city rhythm, with the metro flyover waiting to punish hesitation.",
       "file": "public/audio/elevenlabs/arthur-prerace-neon-track.mp3",
       "status": "planned"
@@ -42,6 +54,9 @@
       "id": "arthur-prerace-valkyrie-track",
       "speaker": "Arthur Bell",
       "voiceEnv": "ELEVENLABS_ARTHUR_VOICE_ID",
+      "lineIds": [
+        "arthur.prerace.valkyrie.track"
+      ],
       "text": "Valkyrie Ridge is the longest and sternest test: ridge tunnel, summit tower, and commitment over every crest.",
       "file": "public/audio/elevenlabs/arthur-prerace-valkyrie-track.mp3",
       "status": "planned"
@@ -50,6 +65,9 @@
       "id": "mags-lights",
       "speaker": "Mags Whitlow",
       "voiceEnv": "ELEVENLABS_MAGS_VOICE_ID",
+      "lineIds": [
+        "mags.lights.five-red"
+      ],
       "text": "Five red lights, then it is noise, nerves, and no excuses.",
       "file": "public/audio/elevenlabs/mags-lights.mp3",
       "status": "planned"
@@ -58,6 +76,9 @@
       "id": "radio-team-damage",
       "speaker": "Radio",
       "voiceEnv": "ELEVENLABS_RADIO_VOICE_ID",
+      "lineIds": [
+        "radio.damage.climbing"
+      ],
       "text": "Damage is climbing. Stay off the outside kerbs and bring it home.",
       "file": "public/audio/elevenlabs/radio-team-damage.mp3",
       "status": "planned"
@@ -66,6 +87,9 @@
       "id": "radio-team-contact",
       "speaker": "Radio",
       "voiceEnv": "ELEVENLABS_RADIO_VOICE_ID",
+      "lineIds": [
+        "radio.contact.damage-check"
+      ],
       "text": "Contact confirmed. Check the front wing and give them space.",
       "file": "public/audio/elevenlabs/radio-team-contact.mp3",
       "status": "planned"
@@ -74,6 +98,9 @@
       "id": "radio-team-tires",
       "speaker": "Radio",
       "voiceEnv": "ELEVENLABS_RADIO_VOICE_ID",
+      "lineIds": [
+        "radio.tires.fading"
+      ],
       "text": "Tyres are fading. Brake earlier and keep the steering smooth.",
       "file": "public/audio/elevenlabs/radio-team-tires.mp3",
       "status": "planned"

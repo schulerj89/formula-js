@@ -13,11 +13,31 @@ const warnings = [];
 
 validateGroup('voiceLines', manifest.voiceLines ?? []);
 validateGroup('songs', manifest.songs ?? []);
+validateVoiceLineIds(manifest.voiceLines ?? []);
 
 if (problems.length > 0) {
   console.error(`ElevenLabs asset verification failed with ${problems.length} problem(s):`);
   for (const problem of problems) console.error(`- ${problem}`);
   process.exit(1);
+}
+
+function validateVoiceLineIds(entries) {
+  if (!Array.isArray(entries)) return;
+  const seen = new Set();
+  for (const entry of entries) {
+    if (!Array.isArray(entry.lineIds) || entry.lineIds.length === 0) {
+      problems.push(`voiceLines.${entry.id ?? 'unknown'} must include at least one lineId`);
+      continue;
+    }
+    for (const lineId of entry.lineIds) {
+      if (typeof lineId !== 'string' || !/^[a-z]+\.[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(lineId)) {
+        problems.push(`voiceLines.${entry.id} has invalid lineId ${lineId}`);
+      }
+      const key = `${entry.speaker}:${lineId}`;
+      if (seen.has(key)) problems.push(`voiceLines.${entry.id} duplicates speaker/lineId ${key}`);
+      seen.add(key);
+    }
+  }
 }
 
 for (const warning of warnings) console.warn(`Warning: ${warning}`);
