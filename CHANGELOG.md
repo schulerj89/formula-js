@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.15.0 - 2026-06-26
+
+- Added corner-aware player handling that uses track kerb/corner pressure, tire health, damage, and steering load.
+- Reduced player grip and steering response when carrying too much speed through loaded corners.
+- Exposed player handling metrics for browser smoke and debug inspection.
+- Added unit coverage for corner grip loss and live race handling snapshots.
+
 ## 1.14.0 - 2026-06-26
 
 - Reduced active-race per-frame churn by caching car wheel references and avoiding repeated child scans.

@@ -8,7 +8,7 @@ import { dialogue } from '../src/data/dialogue';
 import { elevenLabsSongAssets, elevenLabsVoiceAssets, matchVoiceAsset } from '../src/data/elevenlabs';
 import { analyzeRaceAudio, RaceAudio } from '../src/game/audio';
 import elevenLabsManifest from '../public/audio/elevenlabs/manifest.json';
-import { analyzeCarContact, analyzeCpuRacecraft, createRace, type RacerState } from '../src/game/race';
+import { analyzeCarContact, analyzeCpuRacecraft, analyzePlayerHandling, createRace, type RacerState } from '../src/game/race';
 import { createPositionCommentary, createSpotterCommentary, pickActiveRaceEvent } from '../src/game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability } from '../src/game/raceReadability';
 import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
@@ -362,6 +362,58 @@ describe('race simulation', () => {
     expect(snapshot.player.finishTime).toBeGreaterThan(45);
     expect(snapshot.player.finishTime).toBeLessThan(90);
     expect(snapshot.player.lap).toBe(1);
+  });
+
+  it('reduces player grip and steering response through loaded corners', () => {
+    const track = tracks[0];
+    const cornerProgress = track.kerbZones[0][0] + 0.01;
+    const straightProgress = [0.02, 0.18, 0.32, 0.48, 0.64, 0.82].find(
+      (progress) => analyzePlayerHandling({ progress, speed: 70, tires: 1, damage: 1, lateral: 0.4 }, { throttle: true, brake: false, steer: 1 }, track).cornerLoad < 0.2,
+    )!;
+    const straight = analyzePlayerHandling(
+      { progress: straightProgress, speed: 70, tires: 1, damage: 1, lateral: 0.4 },
+      { throttle: true, brake: false, steer: 1 },
+      track,
+    );
+    const corner = analyzePlayerHandling(
+      { progress: cornerProgress, speed: 70, tires: 0.62, damage: 0.82, lateral: 2.3 },
+      { throttle: true, brake: false, steer: 1 },
+      track,
+    );
+
+    expect(corner.cornerLoad).toBeGreaterThan(straight.cornerLoad);
+    expect(corner.grip).toBeLessThan(straight.grip);
+    expect(corner.steeringResponse).toBeLessThan(straight.steeringResponse);
+    expect(corner.brakingDemand).toBeGreaterThan(straight.brakingDemand);
+    expect(corner.understeer).toBeGreaterThan(straight.understeer);
+    expect(corner.understeer).toBeGreaterThan(0);
+  });
+
+  it('exposes player corner handling in live race snapshots', () => {
+    const track = tracks[0];
+    const cornerProgress = track.kerbZones[0][0] + 0.01;
+    const straightProgress = [0.02, 0.18, 0.32, 0.48, 0.64, 0.82].find(
+      (progress) => analyzePlayerHandling({ progress, speed: 70, tires: 1, damage: 1, lateral: 0.4 }, { throttle: true, brake: false, steer: 1 }, track).cornerLoad < 0.2,
+    )!;
+    const createLoadedRace = (progress: number) => {
+      const race = createRace('timeAttack', track, [{ ...playerTemplate, name: settings.playerName }], settings);
+      const snapshot = race.snapshot();
+      snapshot.player.progress = progress;
+      snapshot.player.speed = 70;
+      snapshot.player.tires = 1;
+      snapshot.player.damage = 1;
+      snapshot.player.lateral = 0.4;
+      return race;
+    };
+
+    const straight = createLoadedRace(straightProgress).update(0.5, { throttle: true, brake: false, steer: 0.35 });
+    const corner = createLoadedRace(cornerProgress).update(0.5, { throttle: true, brake: false, steer: 0.35 });
+
+    expect(corner.player.handling.cornerLoad).toBeGreaterThan(straight.player.handling.cornerLoad);
+    expect(corner.player.handling.grip).toBeLessThan(straight.player.handling.grip);
+    expect(corner.player.handling.steeringResponse).toBeLessThan(straight.player.handling.steeringResponse);
+    expect(corner.player.speed).toBeLessThan(straight.player.speed);
+    expect(corner.player.tires).toBeLessThan(straight.player.tires);
   });
 
   it('summarizes nearest rivals for the mobile race readout', () => {

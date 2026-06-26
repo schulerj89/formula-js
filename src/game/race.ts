@@ -20,6 +20,7 @@ export interface RacerState {
   lastContactSeverity: number;
   maxContactSeverity: number;
   lastContactRacerId: string | null;
+  handling: PlayerHandling;
 }
 
 export interface CpuRacecraft {
@@ -29,6 +30,14 @@ export interface CpuRacecraft {
   braking: boolean;
   overtakeLane: -1 | 0 | 1;
   trafficGapMeters: number | null;
+}
+
+export interface PlayerHandling {
+  cornerLoad: number;
+  grip: number;
+  steeringResponse: number;
+  brakingDemand: number;
+  understeer: number;
 }
 
 export interface RaceControl {
@@ -72,6 +81,7 @@ export function createRace(
     lastContactSeverity: 0,
     maxContactSeverity: 0,
     lastContactRacerId: null,
+    handling: defaultPlayerHandling(),
   }));
   const player = states[0];
 
@@ -85,7 +95,7 @@ export function createRace(
       state.lastContactSeverity = Math.max(0, state.lastContactSeverity - dt * 1.4);
 
       if (i === 0) {
-        updatePlayer(state, control, dt, settings);
+        updatePlayer(state, control, dt, settings, track);
       } else {
         updateCpu(state, i, dt, track, states);
       }
@@ -136,13 +146,16 @@ export function createResults(snapshot: RaceSnapshot): RaceResult[] {
   }));
 }
 
-function updatePlayer(state: RacerState, control: RaceControl, dt: number, settings: GameSettings): void {
-  const throttle = control.throttle ? 28 : 0;
-  const brake = control.brake ? 42 : 0;
-  const drag = 9 + Math.abs(control.steer) * 4;
+function updatePlayer(state: RacerState, control: RaceControl, dt: number, settings: GameSettings, track: TrackDefinition): void {
+  const handling = analyzePlayerHandling(state, control, track);
+  state.handling = handling;
+  const throttle = control.throttle ? 28 * (1 - handling.cornerLoad * 0.1) : 0;
+  const brake = control.brake ? 42 * (1 + handling.cornerLoad * 0.12) : 0;
+  const cornerDrag = handling.cornerLoad * Math.max(0, state.speed - 44) * (control.brake ? 0.04 : 0.085);
+  const drag = 9 + Math.abs(control.steer) * 4 + handling.understeer * 8 + cornerDrag;
   state.speed += (throttle - brake - drag) * dt;
   state.speed = clamp(state.speed, 0, 82);
-  state.lateral += control.steer * dt * 8 * Math.max(0.25, state.speed / 60);
+  state.lateral += control.steer * dt * handling.steeringResponse * Math.max(0.25, state.speed / 60);
   const offTrack = Math.max(0, Math.abs(state.lateral) - 4.8);
   if (offTrack > 0) {
     state.speed *= 1 - Math.min(0.65, offTrack * dt * 0.7);
@@ -150,11 +163,34 @@ function updatePlayer(state: RacerState, control: RaceControl, dt: number, setti
   }
   state.lateral *= 1 - dt * 1.6;
   if (settings.realisticTires) {
-    const wear = (0.002 + Math.abs(control.steer) * 0.012 + (control.brake ? 0.01 : 0)) * dt;
+    const wear = (0.002 + Math.abs(control.steer) * 0.012 + (control.brake ? 0.01 : 0) + handling.cornerLoad * 0.004 + handling.understeer * 0.012) * dt;
     state.tires = Math.max(0, state.tires - wear);
   }
   const conditionLimit = 82 * (0.55 + state.damage * 0.45) * (0.72 + state.tires * 0.28);
   state.speed = Math.min(state.speed, conditionLimit);
+}
+
+export function analyzePlayerHandling(
+  state: Pick<RacerState, 'progress' | 'speed' | 'tires' | 'damage' | 'lateral'>,
+  control: RaceControl,
+  track: TrackDefinition,
+): PlayerHandling {
+  const cornerLoad = cornerPressure(state.progress, track);
+  const speedLoad = clamp((state.speed - 34) / 48, 0, 1);
+  const steeringLoad = Math.abs(control.steer);
+  const conditionGrip = 0.6 + clamp(state.tires, 0, 1) * 0.27 + clamp(state.damage, 0, 1) * 0.13;
+  const lateralLoad = clamp(Math.abs(state.lateral) / 5.2, 0, 1);
+  const brakingDemand = clamp(cornerLoad * speedLoad * (control.brake ? 0.55 : control.throttle ? 1 : 0.78), 0, 1);
+  const grip = clamp(conditionGrip - cornerLoad * 0.18 - speedLoad * steeringLoad * 0.14 - lateralLoad * 0.08, 0.44, 1);
+  const understeer = clamp(brakingDemand * steeringLoad - grip * 0.46, 0, 1);
+  const steeringResponse = clamp(8 * (0.58 + grip * 0.42) * (1 - understeer * 0.38), 4.1, 8);
+  return {
+    cornerLoad,
+    grip: Math.round(grip * 1000) / 1000,
+    steeringResponse: Math.round(steeringResponse * 1000) / 1000,
+    brakingDemand: Math.round(brakingDemand * 1000) / 1000,
+    understeer: Math.round(understeer * 1000) / 1000,
+  };
 }
 
 function updateCpu(state: RacerState, index: number, dt: number, track: TrackDefinition, states: RacerState[]): void {
@@ -295,6 +331,16 @@ function defaultRacecraft(): CpuRacecraft {
     braking: false,
     overtakeLane: 0,
     trafficGapMeters: null,
+  };
+}
+
+function defaultPlayerHandling(): PlayerHandling {
+  return {
+    cornerLoad: 0,
+    grip: 1,
+    steeringResponse: 8,
+    brakingDemand: 0,
+    understeer: 0,
   };
 }
 

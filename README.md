@@ -53,4 +53,5 @@ Keep ElevenLabs credentials outside git. The generator reads `ELEVENLABS_API_KEY
 - Active-race spotter radio for side-by-side threats and fast-closing traffic, with priority metrics.
 - Real driven-lap progression for time attack and campaign races.
 - CPU racers with corner braking, racing-line targets, traffic gaps, and overtaking lanes.
+- Corner-aware player handling with tire/damage grip loss, understeer, and braking demand metrics.
 - Procedural car fallback in battery/balanced modes, with generated GLB cars enabled in high-detail mode when all kit pieces load.

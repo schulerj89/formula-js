@@ -75,7 +75,7 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   if (isMobile) expect(metrics.estimatedFps).toBeGreaterThanOrEqual(24);
   expect(metrics.p95FrameMs).toBeGreaterThan(0);
   expect(metrics.performanceWork.leaderboardRenders).toBeLessThan(90);
-  expect(metrics.performanceWork.debugMetricRefreshes).toBeLessThan(140);
+  expect(metrics.performanceWork.debugMetricRefreshes).toBeLessThan(180);
   expect(metrics.performanceWork.debugMetricCadenceMs).toBe(200);
   expect(metrics.audio.musicCue).toBe('Silent');
   expect(metrics.audio.race.gear).toBeGreaterThanOrEqual(1);
@@ -97,6 +97,9 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(['clear', 'soon', 'now']).toContain(metrics.raceReadability.brakeUrgency);
   expect(typeof metrics.raceReadability.closingAhead).toBe('boolean');
   expect(typeof metrics.raceReadability.closingBehind).toBe('boolean');
+  expect(metrics.playerHandling.grip).toBeGreaterThan(0);
+  expect(metrics.playerHandling.steeringResponse).toBeGreaterThan(0);
+  expect(metrics.playerHandling.cornerLoad).toBeGreaterThanOrEqual(0);
   expect(metrics.cpuRacecraft.targetSpeedMax).toBeGreaterThan(40);
   expect(metrics.cpuRacecraft.maxCornerLoad).toBeGreaterThanOrEqual(0);
   expect(metrics.cpuRacecraft.overtakeCount).toBeGreaterThanOrEqual(0);

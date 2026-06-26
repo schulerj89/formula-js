@@ -488,6 +488,7 @@ function showSetup(): void {
 }
 
 function startPreRace(): void {
+  invalidateDebugMetrics();
   settings.playerName = playerNameInput.value.trim() || 'Rookie';
   saveSettings();
   gameState = 'prerace';
@@ -526,6 +527,7 @@ function startPreRace(): void {
 }
 
 function startRace(): void {
+  invalidateDebugMetrics();
   gameState = 'race';
   lightsOn = 0;
   startLights.classList.remove('active');
@@ -568,6 +570,7 @@ function finishRace(snapshot: RaceSnapshot): void {
   showScreen('podium');
   renderPodium();
   startPodiumCommentary(createRacePodiumCommentary(results, settings.playerName, campaignScores));
+  invalidateDebugMetrics();
 }
 
 function buildRacers(): RacerDefinition[] {
@@ -930,6 +933,7 @@ function clearPodiumCommentary(): void {
 }
 
 function showCampaignFinale(): void {
+  invalidateDebugMetrics();
   gameState = 'finale';
   stagePodiumCeremony(campaignScores.slice(0, 3).map((score) => score.racerId), true);
   showScreen('podium');
@@ -1315,6 +1319,11 @@ function exposeDebug(dt = 0): void {
   };
 }
 
+function invalidateDebugMetrics(): void {
+  cachedDebugMetrics = null;
+  debugMetricTimer = 0;
+}
+
 function buildDebugMetrics() {
   const sortedFrameTimes = [...frameTimes].sort((a, b) => a - b);
   const p50 = percentile(sortedFrameTimes, 0.5);
@@ -1376,6 +1385,7 @@ function buildDebugMetrics() {
       nextBrakeMeters,
       brakeUrgency,
     },
+    playerHandling: latestSnapshot?.player.handling ?? null,
     cpuRacecraft,
     contact: {
       playerEvents: latestSnapshot?.player.contactEvents ?? 0,
