@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 - 2026-06-26
+
+- Added a mobile-readable five-red-light pre-race start sequence with countdown metrics.
+- Added a tutorial panel with launch, braking, tyre, and damage guidance.
+- Added Playwright coverage and artifacts for the pre-race lights state.
+- Added a race-start decision doc for future timing/audio tuning.
+
 ## 0.4.0 - 2026-06-26
 
 - Added player garage paint swatches for body and helmet customization.

@@ -41,6 +41,7 @@ let campaignScores: CampaignScore[] = [];
 let captionTimer = 0;
 let captionIndex = 0;
 let lightTimer = 0;
+let lightsOn = 0;
 let lastRadio = '';
 let campaignTrackIndex = 0;
 let uiBound = false;
@@ -67,6 +68,7 @@ root.innerHTML = `
         <div class="menu-actions">
           <button class="primary" data-action="campaign">Campaign</button>
           <button class="secondary" data-action="timeAttack">Time Attack</button>
+          <button class="secondary" data-action="tutorial">Tutorial</button>
           <button class="secondary" data-action="settings">Settings</button>
           <button class="secondary" data-action="replay">Replay</button>
         </div>
@@ -102,6 +104,19 @@ root.innerHTML = `
           <label class="check-row"><input id="leaderboardToggle" type="checkbox" /> Show leaderboard panel</label>
           <button class="primary" data-action="back">Done</button>
         </div>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="tutorial">
+      <div class="panel">
+        <h2>Tutorial</h2>
+        <div class="tutorial-list">
+          <p><strong>Launch</strong> Hold Go when the lights build, then steer gently into the first corner.</p>
+          <p><strong>Brake</strong> Release Go to brake in hold mode, or use Brake with split pedals.</p>
+          <p><strong>Tyres</strong> Smooth steering saves tyre health and keeps exits faster.</p>
+          <p><strong>Damage</strong> Stay off the grass and avoid heavy kerb strikes when damage is enabled.</p>
+        </div>
+        <button class="primary" data-action="back">Done</button>
       </div>
     </section>
 
@@ -142,6 +157,14 @@ root.innerHTML = `
 
     <div class="caption" id="caption"></div>
 
+    <div class="start-lights" id="startLights" aria-label="Race start lights">
+      <div class="start-light" data-light="1"></div>
+      <div class="start-light" data-light="2"></div>
+      <div class="start-light" data-light="3"></div>
+      <div class="start-light" data-light="4"></div>
+      <div class="start-light" data-light="5"></div>
+    </div>
+
     <div class="controls" id="controls">
       <div class="control-cluster"><button class="steer" data-control="left" aria-label="Steer left">&lt;</button><button class="steer" data-control="right" aria-label="Steer right">&gt;</button></div>
       <button class="pedal brake" data-control="brake">Brake</button>
@@ -169,6 +192,7 @@ const trackStrip = root.querySelector<HTMLDivElement>('#trackStrip')!;
 const bodyPaintSwatches = root.querySelector<HTMLDivElement>('#bodyPaintSwatches')!;
 const helmetPaintSwatches = root.querySelector<HTMLDivElement>('#helmetPaintSwatches')!;
 const caption = root.querySelector<HTMLDivElement>('#caption')!;
+const startLights = root.querySelector<HTMLDivElement>('#startLights')!;
 const controls = root.querySelector<HTMLDivElement>('#controls')!;
 const hud = root.querySelector<HTMLDivElement>('.hud')!;
 const leaderboard = root.querySelector<HTMLElement>('#leaderboard')!;
@@ -254,6 +278,10 @@ function initUi(): void {
       showSetup();
     } else if (action === 'settings') {
       showScreen('settings');
+    } else if (action === 'tutorial') {
+      gameState = 'tutorial';
+      showScreen('tutorial');
+      showCaption('Arthur Bell', fill(dialogue.tutorial[0][1]));
     } else if (action === 'back' || action === 'menu') {
       gameState = 'menu';
       audio.stopEngine();
@@ -326,6 +354,7 @@ function update(dt: number): void {
   } else if (gameState === 'prerace') {
     audio.playMusic(musicThemes.prerace, dt);
     lightTimer -= dt;
+    updateStartLights();
     if (lightTimer <= 0) startRace();
     updateMenuCamera(dt * 0.7, false);
   } else if (gameState === 'race') {
@@ -367,6 +396,9 @@ function startPreRace(): void {
   settings.playerName = playerNameInput.value.trim() || 'Rookie';
   saveSettings();
   gameState = 'prerace';
+  lightsOn = 0;
+  updateStartLights();
+  startLights.classList.add('active');
   showScreen(null);
   hud.classList.remove('active');
   controls.classList.remove('active');
@@ -375,13 +407,15 @@ function startPreRace(): void {
   replayRecorder = createReplayRecorder(selectedTrack.id, selectedTrack.name, settings.playerName);
   latestSnapshot = race.snapshot();
   replayRecorder.record(0, latestSnapshot);
-  lightTimer = 2.8;
+  lightTimer = 3.4;
   audio.beep(5);
   showCaption('Arthur Bell', fill(dialogue.prerace[0][1]));
 }
 
 function startRace(): void {
   gameState = 'race';
+  lightsOn = 0;
+  startLights.classList.remove('active');
   resetFrameStats();
   audio.stopMusic();
   hud.classList.add('active');
@@ -390,6 +424,15 @@ function startRace(): void {
   control.throttle = false;
   control.steer = 0;
   showCaption('Mags Whitlow', fill(dialogue.lights[1][1]));
+}
+
+function updateStartLights(): void {
+  const elapsed = 3.4 - lightTimer;
+  lightsOn = Math.min(5, Math.max(0, Math.floor(elapsed / 0.48) + 1));
+  if (lightTimer <= 0.35) lightsOn = 5;
+  startLights.querySelectorAll<HTMLElement>('.start-light').forEach((light, index) => {
+    light.classList.toggle('on', index < lightsOn);
+  });
 }
 
 function finishRace(snapshot: RaceSnapshot): void {
@@ -706,6 +749,7 @@ function exposeDebug(): void {
     replayBytes: lastReplay?.estimatedBytes ?? 0,
     replayDroppedSamples: lastReplay?.droppedSamples ?? 0,
     replaySampleRate: lastReplay?.sampleRate ?? 0,
+    lightsOn,
     campaignLeader: campaignLeader(campaignScores)?.name ?? null,
     audio: audio.metrics(),
     assetKit: formulaAssetManifest,

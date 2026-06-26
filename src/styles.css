@@ -168,6 +168,17 @@ p {
   color: #d8e7f3;
 }
 
+.tutorial-list {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  color: #d8e7f3;
+}
+
+.tutorial-list strong {
+  color: #f7c948;
+}
+
 .garage-row {
   display: grid;
   grid-template-columns: 72px 1fr;
@@ -356,6 +367,38 @@ p {
 
 .caption strong {
   color: #f7c948;
+}
+
+.start-lights {
+  position: absolute;
+  left: 50%;
+  top: max(18px, env(safe-area-inset-top));
+  display: none;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgb(6 10 16 / 78%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.start-lights.active {
+  display: flex;
+}
+
+.start-light {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #241014;
+  border: 2px solid rgb(255 255 255 / 20%);
+  box-shadow: inset 0 0 8px rgb(0 0 0 / 65%);
+}
+
+.start-light.on {
+  background: #ff2d3d;
+  box-shadow: 0 0 18px rgb(255 45 61 / 90%);
 }
 
 .controls {

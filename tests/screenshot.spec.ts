@@ -10,10 +10,17 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   });
   await page.getByRole('button', { name: 'Azure' }).click();
   await page.getByRole('button', { name: 'Gold' }).click();
+  await page.getByRole('button', { name: 'Tutorial' }).click();
+  await expect(page.getByRole('heading', { name: 'Tutorial' })).toBeVisible();
+  await page.getByRole('button', { name: 'Done' }).click();
 
   await page.getByRole('button', { name: 'Time Attack' }).click();
   await page.getByRole('button', { name: 'Race' }).click();
+  await expect(page.locator('#startLights')).toBeVisible();
+  await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.lightsOn >= 3);
+  await page.screenshot({ path: testInfo.outputPath('start-lights.png'), fullPage: true });
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'race');
+  await expect(page.locator('#startLights')).toBeHidden();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: testInfo.outputPath('race-start.png'), fullPage: true });
 
