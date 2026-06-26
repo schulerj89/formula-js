@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.30.1 - 2026-06-26
+
+- Tightened standing agent guidance for uncertain expert decisions, title decluttering, isolated asset inspection, and dedicated radio voice identity.
+- Added audio-plan and audio-check validation so Radio lines keep using `ELEVENLABS_RADIO_VOICE_ID` instead of announcer voice IDs.
+
 ## 1.30.0 - 2026-06-26
 
 - Added planned ElevenLabs voice assets for the fixed replay middle-sector, replay damage, and replay tyre highlight lines.

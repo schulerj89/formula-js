@@ -133,6 +133,7 @@ const songs = [
   },
 ];
 
+validateVoiceIdentity();
 if (!dryRun) await loadLocalEnvFiles();
 await mkdir(outDir, { recursive: true });
 const apiKey = dryRun ? '' : await loadApiKey();
@@ -200,6 +201,20 @@ for (const song of songs) {
 
 await writeFile(path.join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`${dryRun ? 'Planned' : 'Generated'} ${manifest.voiceLines.length} voice lines and ${manifest.songs.length} songs in ${path.relative(root, outDir)}`);
+
+function validateVoiceIdentity() {
+  const voiceEnvBySpeaker = new Map([
+    ['Arthur Bell', 'ELEVENLABS_ARTHUR_VOICE_ID'],
+    ['Mags Whitlow', 'ELEVENLABS_MAGS_VOICE_ID'],
+    ['Radio', 'ELEVENLABS_RADIO_VOICE_ID'],
+  ]);
+  const invalidLines = voiceLines.filter((line) => line.voiceEnv !== voiceEnvBySpeaker.get(line.speaker));
+  if (invalidLines.length > 0) {
+    throw new Error(
+      `Voice line speaker/env mismatch: ${invalidLines.map((line) => `${line.id} uses ${line.voiceEnv} for ${line.speaker}`).join(', ')}`,
+    );
+  }
+}
 
 async function postAudio(url, body) {
   if (!apiKey) throw new Error('Missing ElevenLabs API key. Set ELEVENLABS_API_KEY or keep C:/Users/joshs/Projects/eleven-labs-api-key.txt.');

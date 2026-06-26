@@ -14,6 +14,7 @@ const warnings = [];
 validateGroup('voiceLines', manifest.voiceLines ?? []);
 validateGroup('songs', manifest.songs ?? []);
 validateVoiceLineIds(manifest.voiceLines ?? []);
+validateVoiceIdentity(manifest.voiceLines ?? []);
 
 if (problems.length > 0) {
   console.error(`ElevenLabs asset verification failed with ${problems.length} problem(s):`);
@@ -36,6 +37,25 @@ function validateVoiceLineIds(entries) {
       const key = `${entry.speaker}:${lineId}`;
       if (seen.has(key)) problems.push(`voiceLines.${entry.id} duplicates speaker/lineId ${key}`);
       seen.add(key);
+    }
+  }
+}
+
+function validateVoiceIdentity(entries) {
+  if (!Array.isArray(entries)) return;
+  const voiceEnvBySpeaker = new Map([
+    ['Arthur Bell', 'ELEVENLABS_ARTHUR_VOICE_ID'],
+    ['Mags Whitlow', 'ELEVENLABS_MAGS_VOICE_ID'],
+    ['Radio', 'ELEVENLABS_RADIO_VOICE_ID'],
+  ]);
+  for (const entry of entries) {
+    const expectedVoiceEnv = voiceEnvBySpeaker.get(entry.speaker);
+    if (!expectedVoiceEnv) {
+      problems.push(`voiceLines.${entry.id ?? 'unknown'} has unsupported speaker ${entry.speaker}`);
+      continue;
+    }
+    if (entry.voiceEnv !== expectedVoiceEnv) {
+      problems.push(`voiceLines.${entry.id} must use ${expectedVoiceEnv} for ${entry.speaker}, not ${entry.voiceEnv}`);
     }
   }
 }
