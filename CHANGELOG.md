@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.18.0 - 2026-06-26
+
+- Added replay playback debug metrics for active state, duration, event progress, focus racer, last delivered replay event, and retained frame count.
+- Added a browser smoke that completes a race, opens replay playback from the podium, and verifies highlight commentary advances.
+- Added replay budget and replay scene assertions to the browser verification script.
+
 ## 1.17.0 - 2026-06-26
 
 - Added scene lifecycle metrics for race scene rebuild counts and active car counts.

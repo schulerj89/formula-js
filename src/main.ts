@@ -14,7 +14,7 @@ import { createFinaleCommentary, createRacePodiumCommentary, type PodiumCommenta
 import { createRace, createResults, type RaceControl, type RaceSnapshot } from './game/race';
 import { pickActiveRaceEvent, type RaceCommentaryKind } from './game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability, type TrackMapLayout } from './game/raceReadability';
-import { createReplayRecorder, findReplayFrame, type RaceReplay, type ReplayRecorder } from './game/replay';
+import { createReplayRecorder, findReplayFrame, type RaceReplay, type ReplayHighlightEvent, type ReplayRecorder } from './game/replay';
 import { buildRaceScene, createPodiumCeremony, type PodiumCeremonyStats, type SceneBuild, type SceneDetailLevel } from './game/scene';
 import type { GameMode, GameSettings, GameState, RacerDefinition, RaceResult, TrackDefinition } from './types';
 
@@ -73,6 +73,7 @@ let replayWrappedElapsed = 0;
 let replayEventIndex = 0;
 let replayNextCaptionAt = 0;
 let replayFocusRacerId = 'player';
+let lastReplayEvent: ReplayHighlightEvent | null = null;
 let podiumGroup: THREE.Group | null = null;
 let podiumStats: PodiumCeremonyStats | null = null;
 let podiumFocusId: string | null = null;
@@ -1192,6 +1193,7 @@ function startReplayPlayback(): void {
   replayEventIndex = 0;
   replayNextCaptionAt = 0;
   replayFocusRacerId = 'player';
+  lastReplayEvent = null;
   gameState = 'replay';
   showScreen(null);
   hud.classList.remove('active');
@@ -1237,6 +1239,7 @@ function updateReplayEvents(replay: RaceReplay): void {
   replayEventIndex += 1;
   replayNextCaptionAt = wrapped + 4.4;
   replayFocusRacerId = event.focusRacerId ?? replayFocusRacerId;
+  lastReplayEvent = event;
   showCaption(event.speaker, event.text);
 }
 
@@ -1401,6 +1404,23 @@ function buildDebugMetrics() {
     replayBytes: lastReplay?.estimatedBytes ?? 0,
     replayDroppedSamples: lastReplay?.droppedSamples ?? 0,
     replaySampleRate: lastReplay?.sampleRate ?? 0,
+    replayPlayback: {
+      active: gameState === 'replay' && Boolean(lastReplay),
+      elapsed: Math.round(replayElapsed * 10) / 10,
+      wrappedElapsed: Math.round(replayWrappedElapsed * 10) / 10,
+      duration: lastReplay?.duration ?? 0,
+      eventIndex: replayEventIndex,
+      eventCount: lastReplay?.events.length ?? 0,
+      focusRacerId: replayFocusRacerId,
+      frameCount: lastReplay?.frames.length ?? 0,
+      lastEvent: lastReplayEvent
+        ? {
+            kind: lastReplayEvent.kind,
+            speaker: lastReplayEvent.speaker,
+            focusRacerId: lastReplayEvent.focusRacerId ?? null,
+          }
+        : null,
+    },
     lightsOn,
     caption: {
       speaker: lastCaptionSpeaker,

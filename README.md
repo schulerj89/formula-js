@@ -39,6 +39,7 @@ Keep ElevenLabs credentials outside git. The generator reads `ELEVENLABS_API_KEY
 - Dynamic active-race commentary for position gains/losses with cooldown and radio-priority metrics.
 - Active-race performance pass that caches wheel animation targets, throttles debug metric sorting, and avoids redundant HUD/map DOM writes.
 - Repeat-race mobile performance smoke for scene rebuild, replay-byte, render-counter, and heap-growth regression checks.
+- Post-race replay smoke that verifies playback camera state and announcer/radio highlight commentary.
 - Player garage paint swatches for body and helmet customization.
 - GPT-image reference art, Meshy preview GLBs, and a runtime loader for modular chassis, wheel, and driver assets.
 - Isolated asset inspector page for checking generated GLBs and the procedural fallback away from the main game.
