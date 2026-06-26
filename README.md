@@ -16,6 +16,7 @@ Mobile-first Three.js formula racing game.
 
 - Decluttered title menu with track flyover camera, primary race actions, and secondary utility links.
 - Campaign, time attack, settings, replay, and podium flow.
+- Browser smoke coverage clicks through the Campaign podium and Finale path using deterministic race finishes.
 - Tutorial panel with launch, braking, tyre, and damage guidance.
 - Five-red-light pre-race start sequence with announcer setup.
 - Queued Arthur/Mags caption exchanges for tutorial, pre-race, replay, podium, and finale beats.

@@ -916,6 +916,37 @@ function forcePodiumForSmoke(finaleMode = false): void {
   }
 }
 
+function finishCampaignRaceForSmoke(): void {
+  if (gameState !== 'race' || !latestSnapshot) return;
+  const totalLaps = mode === 'timeAttack' ? 1 : selectedTrack.laps;
+  const playerFirst = [...latestSnapshot.racers].sort((a, b) => {
+    if (a.definition.id === playerTemplate.id) return -1;
+    if (b.definition.id === playerTemplate.id) return 1;
+    return b.definition.skill - a.definition.skill;
+  });
+  playerFirst.forEach((racer, index) => {
+    const finishTime = 82 + campaignTrackIndex * 5 + index * 1.55;
+    racer.distance = totalLaps;
+    racer.progress = 0;
+    racer.lap = totalLaps;
+    racer.speed = 0;
+    racer.finished = true;
+    racer.finishTime = finishTime;
+    racer.totalTime = finishTime;
+    racer.bestLap = finishTime / totalLaps;
+    racer.currentLapTime = 0;
+    racer.damage = Math.max(0.72, 0.96 - index * 0.025);
+    racer.tires = Math.max(0.62, 0.86 - index * 0.026);
+  });
+  finishRace({
+    racers: latestSnapshot.racers,
+    player: latestSnapshot.player,
+    standings: playerFirst,
+    position: playerFirst.findIndex((racer) => racer.definition.id === playerTemplate.id) + 1,
+    complete: true,
+  });
+}
+
 function forceContactForSmoke(): void {
   if (!latestSnapshot || gameState !== 'race') return;
   const rival = latestSnapshot.racers.find((racer) => racer.definition.id !== playerTemplate.id && !racer.finished);
@@ -1271,6 +1302,18 @@ function exposeDebug(): void {
       cooldownRemaining: Math.max(0, Math.round((4.4 - (raceCommentaryElapsed - lastRaceCommentaryAt)) * 10) / 10),
     },
     campaignLeader: campaignLeader(campaignScores)?.name ?? null,
+    campaign: {
+      mode,
+      trackIndex: campaignTrackIndex,
+      trackCount: tracks.length,
+      scores: campaignScores,
+      nextAction:
+        mode === 'campaign' && gameState === 'podium'
+          ? campaignTrackIndex < tracks.length - 1
+            ? 'next-race'
+            : 'finale'
+          : null,
+    },
     sceneDetails: sceneBuild?.detailStats ?? null,
     podium: {
       active: Boolean(podiumGroup),
@@ -1309,6 +1352,8 @@ function exposeDebug(): void {
       forcePositionGain: forcePositionGainForSmoke,
       forceSideThreat: forceSideThreatForSmoke,
       forceAnnouncementConflict: forceAnnouncementConflictForSmoke,
+      forceRaceFinish: finishCampaignRaceForSmoke,
+      finishCampaignRace: finishCampaignRaceForSmoke,
     },
   };
 }

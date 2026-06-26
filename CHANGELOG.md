@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.12.0 - 2026-06-26
+
+- Added a deterministic campaign finish smoke hook that still uses the real race-finish, replay, podium, scoring, and finale transitions.
+- Added browser coverage for the Campaign -> podium -> Next Race -> Finale UI path without waiting for four full races.
+- Exposed campaign progress metrics for smoke tests and debug inspection.
+- Added unit coverage for four-race campaign point accumulation.
+
 ## 1.11.0 - 2026-06-26
 
 - Added a reusable caption queue so Arthur and Mags can trade tutorial, pre-race, and replay lines instead of only showing the first line.

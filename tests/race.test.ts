@@ -691,6 +691,27 @@ describe('campaign scoring', () => {
     expect(next[1].points).toBe(18);
     expect(next[2].podiums).toBe(1);
   });
+
+  it('accumulates a four-race player championship', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const results = racers.map((racer, index) => ({
+      racerId: racer.id,
+      name: racer.name,
+      totalTime: 80 + index,
+      bestLap: 26,
+      damage: 1,
+      tires: 1,
+    }));
+    let scores = createCampaignScores(racers);
+    for (let raceIndex = 0; raceIndex < tracks.length; raceIndex += 1) {
+      scores = applyCampaignResults(scores, results);
+    }
+
+    expect(scores[0].racerId).toBe('player');
+    expect(scores[0].points).toBe(100);
+    expect(scores[0].wins).toBe(4);
+    expect(scores[0].podiums).toBe(4);
+  });
 });
 
 describe('podium commentary', () => {
