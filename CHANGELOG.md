@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.28.1 - 2026-06-26
+
+- Tightened `AGENTS.md` so uncertain domain decisions explicitly require creating or using the relevant expert/subagent and recording the outcome in `docs/decisions/`.
+- Reaffirmed the durable guidance for radio-team voice identity, decluttered title flow, isolated asset inspection, and version-slice progress lists.
+
 ## 1.28.0 - 2026-06-26
 
 - Marked shared procedural car geometries as retained resources so scene rebuilds do not dispose reusable fallback geometry.
