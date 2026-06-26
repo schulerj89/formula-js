@@ -487,10 +487,18 @@ describe('customization and asset pipeline data', () => {
     const driver = car.getObjectByName('customizable-driver')!;
     const leftArm = driver.getObjectByName('celebration-arm-left')!;
     const idleArmRotation = leftArm.rotation.z;
+    animateDriverIdle(car, 0.8, true, false);
+    const podiumSummary = summarizeDriverRig(car);
+    const podiumHeight = driver.position.y;
     animateDriverIdle(car, 0.8, true, true);
+    const finaleSummary = summarizeDriverRig(car);
 
     expect(driver.position.y).toBeGreaterThanOrEqual(driver.userData.baseY);
     expect(leftArm.rotation.z).not.toBe(idleArmRotation);
+    expect(podiumSummary.celebrationMode).toBe('podium');
+    expect(finaleSummary.celebrationMode).toBe('finale');
+    expect(finaleSummary.celebrationEnergy).toBeGreaterThan(podiumSummary.celebrationEnergy);
+    expect(driver.position.y).toBeGreaterThan(podiumHeight);
     expect(car.getObjectByName('customizable-helmet')).toBeTruthy();
   });
 

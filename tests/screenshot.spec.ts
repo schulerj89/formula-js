@@ -275,6 +275,9 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(podiumMetrics.caption.text).toContain('Rookie wins it');
   expect(podiumMetrics.driverRig.visibleCars).toBe(3);
   expect(podiumMetrics.driverRig.podiumCelebratingRacerId).toBe('player');
+  expect(podiumMetrics.driverRig.podiumCelebrationMode).toBe('podium');
+  await expect(page.locator('.hud')).toBeHidden();
+  await expect(page.locator('#controls')).toBeHidden();
 
   await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.debug?.forcePodium?.(true));
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'finale');
@@ -291,4 +294,8 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(finaleMetrics.caption.text).toContain('Rookie is champion after 4 races');
   expect(finaleMetrics.driverRig.visibleCars).toBe(3);
   expect(finaleMetrics.driverRig.podiumCelebratingRacerId).toBe('player');
+  expect(finaleMetrics.driverRig.podiumCelebrationMode).toBe('finale');
+  expect(finaleMetrics.driverRig.podiumCelebrationEnergy).toBeGreaterThan(podiumMetrics.driverRig.podiumCelebrationEnergy);
+  await expect(page.locator('.hud')).toBeHidden();
+  await expect(page.locator('#controls')).toBeHidden();
 });

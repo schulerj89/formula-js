@@ -35,6 +35,8 @@ export interface DriverRigSummary {
   hasVisor: boolean;
   armCount: number;
   hasGeneratedSuit: boolean;
+  celebrationMode: 'idle' | 'podium' | 'finale';
+  celebrationEnergy: number;
 }
 
 export function createFormulaCar(color: number, helmet: number): THREE.Group {
@@ -144,18 +146,34 @@ export function animateDriverIdle(car: THREE.Group, elapsed: number, celebration
   const rightArm = driver.getObjectByName('celebration-arm-right');
   const helmet = driver.getObjectByName('customizable-helmet');
   if (celebration) {
-    const energy = finale ? 1.55 : 1;
-    driver.rotation.z = Math.sin(elapsed * 8) * 0.22 * energy;
-    driver.rotation.x = Math.sin(elapsed * 4) * 0.08 * energy;
-    driver.position.y = baseY + Math.abs(Math.sin(elapsed * (finale ? 7 : 5))) * 0.12 * energy;
-    if (leftArm) leftArm.rotation.z = -0.95 - Math.sin(elapsed * 7) * 0.36 * energy;
-    if (rightArm) rightArm.rotation.z = 0.95 + Math.cos(elapsed * 7) * 0.36 * energy;
-    if (helmet) helmet.rotation.y = Math.sin(elapsed * 5) * 0.16 * energy;
+    driver.userData.celebrationMode = finale ? 'finale' : 'podium';
+    driver.userData.celebrationEnergy = finale ? 1.75 : 1;
+    if (finale) {
+      const pulse = Math.abs(Math.sin(elapsed * 6.8));
+      driver.rotation.z = Math.sin(elapsed * 5.2) * 0.16;
+      driver.rotation.x = -0.12 + Math.sin(elapsed * 3.6) * 0.1;
+      driver.rotation.y = Math.sin(elapsed * 2.8) * 0.18;
+      driver.position.y = baseY + 0.07 + pulse * 0.23;
+      if (leftArm) leftArm.rotation.z = -1.55 - Math.sin(elapsed * 5.8) * 0.22;
+      if (rightArm) rightArm.rotation.z = 1.55 + Math.cos(elapsed * 5.8) * 0.22;
+      if (helmet) helmet.rotation.y = Math.sin(elapsed * 6.2) * 0.32;
+      return;
+    }
+    driver.rotation.z = Math.sin(elapsed * 8) * 0.22;
+    driver.rotation.x = Math.sin(elapsed * 4) * 0.08;
+    driver.rotation.y = 0;
+    driver.position.y = baseY + Math.abs(Math.sin(elapsed * 5)) * 0.12;
+    if (leftArm) leftArm.rotation.z = -0.95 - Math.sin(elapsed * 7) * 0.36;
+    if (rightArm) rightArm.rotation.z = 0.95 + Math.cos(elapsed * 7) * 0.36;
+    if (helmet) helmet.rotation.y = Math.sin(elapsed * 5) * 0.16;
     return;
   }
+  driver.userData.celebrationMode = 'idle';
+  driver.userData.celebrationEnergy = 0;
   driver.position.y = baseY;
   driver.rotation.z = Math.sin(elapsed * 1.5) * 0.025;
   driver.rotation.x = 0;
+  driver.rotation.y = 0;
   if (leftArm) leftArm.rotation.z = -0.34 + Math.sin(elapsed * 1.4) * 0.035;
   if (rightArm) rightArm.rotation.z = 0.34 - Math.sin(elapsed * 1.4) * 0.035;
   if (helmet) helmet.rotation.y = Math.sin(elapsed * 1.2) * 0.025;
@@ -164,7 +182,16 @@ export function animateDriverIdle(car: THREE.Group, elapsed: number, celebration
 export function summarizeDriverRig(car: THREE.Group): DriverRigSummary {
   const driver = car.getObjectByName('customizable-driver');
   if (!driver) {
-    return { hasDriver: false, hasTorso: false, hasHelmet: false, hasVisor: false, armCount: 0, hasGeneratedSuit: false };
+    return {
+      hasDriver: false,
+      hasTorso: false,
+      hasHelmet: false,
+      hasVisor: false,
+      armCount: 0,
+      hasGeneratedSuit: false,
+      celebrationMode: 'idle',
+      celebrationEnergy: 0,
+    };
   }
   return {
     hasDriver: true,
@@ -173,5 +200,7 @@ export function summarizeDriverRig(car: THREE.Group): DriverRigSummary {
     hasVisor: Boolean(driver.getObjectByName('driver-visor')),
     armCount: [driver.getObjectByName('celebration-arm-left'), driver.getObjectByName('celebration-arm-right')].filter(Boolean).length,
     hasGeneratedSuit: Boolean(driver.getObjectByName('generated-driver-suit')),
+    celebrationMode: driver.userData.celebrationMode ?? 'idle',
+    celebrationEnergy: typeof driver.userData.celebrationEnergy === 'number' ? driver.userData.celebrationEnergy : 0,
   };
 }

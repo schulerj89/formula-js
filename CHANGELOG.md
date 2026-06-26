@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.32.1 - 2026-06-26
+
+- Made the campaign finale winner celebration a distinct overhead-arm champion dance instead of a louder copy of the normal podium motion.
+- Exposed podium/finale celebration mode and energy in driver-rig debug metrics and screenshot coverage.
+
 ## 1.32.0 - 2026-06-26
 
 - Anchored replay highlight events to active-race incidents such as contact, position changes, and spotter calls.

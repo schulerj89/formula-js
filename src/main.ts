@@ -1090,6 +1090,13 @@ function showCampaignFinale(): void {
 function forcePodiumForSmoke(finaleMode = false): void {
   const racers = buildRacers();
   if (!sceneBuild) sceneBuild = buildTrackedRaceScene(selectedTrack, racers);
+  hud.classList.remove('active');
+  controls.classList.remove('active');
+  leaderboard.classList.remove('active');
+  leaderboardExpanded = false;
+  control.throttle = false;
+  control.brake = false;
+  control.steer = 0;
   results = racers.slice(0, 3).map((racer, index) => ({
     racerId: racer.id,
     name: racer.name,
@@ -1723,9 +1730,13 @@ function summarizeSceneDriverRigs(): {
   armPairs: number;
   generatedSuits: number;
   podiumCelebratingRacerId: string | null;
+  podiumCelebrationMode: 'idle' | 'podium' | 'finale';
+  podiumCelebrationEnergy: number;
 } {
   const cars = sceneBuild ? [...sceneBuild.cars.values()] : [];
   const summaries = cars.map((car) => summarizeDriverRig(car));
+  const celebratingCar = gameState === 'podium' || gameState === 'finale' ? sceneBuild?.cars.get(podiumFocusId ?? '') : null;
+  const celebratingSummary = celebratingCar ? summarizeDriverRig(celebratingCar) : null;
   const carMeshCount = cars.reduce((total, car) => {
     let meshes = 0;
     car.traverse((object) => {
@@ -1744,6 +1755,8 @@ function summarizeSceneDriverRigs(): {
     armPairs: summaries.filter((summary) => summary.armCount >= 2).length,
     generatedSuits: summaries.filter((summary) => summary.hasGeneratedSuit).length,
     podiumCelebratingRacerId: gameState === 'podium' || gameState === 'finale' ? podiumFocusId : null,
+    podiumCelebrationMode: celebratingSummary?.celebrationMode ?? 'idle',
+    podiumCelebrationEnergy: celebratingSummary?.celebrationEnergy ?? 0,
   };
 }
 
