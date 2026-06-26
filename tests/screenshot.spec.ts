@@ -89,14 +89,15 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: 'Done' }).click();
 
   await page.getByRole('button', { name: 'Time Attack' }).click();
+  await page.locator('#trackSelect').selectOption('marina');
   await page.getByRole('button', { name: 'Race' }).click();
   await expect(page.locator('#startLights')).toBeVisible();
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.lightsOn >= 3);
   const preraceMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
   expect(preraceMetrics.captionSequence.delivered).toBeGreaterThanOrEqual(2);
   expect(preraceMetrics.captionSequence.speakers.sort()).toEqual(['Arthur Bell', 'Mags Whitlow']);
-  expect(preraceMetrics.preRaceCommentary.trackId).toBe('silverpine');
-  expect(preraceMetrics.preRaceCommentary.lineIds).toEqual(['arthur.prerace.silverpine.track', 'mags.prerace.silverpine.rivals']);
+  expect(preraceMetrics.preRaceCommentary.trackId).toBe('marina');
+  expect(preraceMetrics.preRaceCommentary.lineIds).toEqual(['arthur.prerace.marina.track', 'mags.prerace.marina.rivals']);
   expect(preraceMetrics.campaign.objective).toBeNull();
   await expect(page.locator('#campaignObjective')).toBeHidden();
   await page.screenshot({ path: testInfo.outputPath('start-lights.png'), fullPage: true });
@@ -129,13 +130,14 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
 
   const metrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
   expect(metrics.state).toBe('race');
+  expect(metrics.track).toBe('marina');
   expect(metrics.liveReplayFrames).toBeGreaterThan(20);
   expect(metrics.replayFrames).toBe(0);
   expect(metrics.triangles).toBeGreaterThan(30_000);
   if (isMobile) {
     expect(metrics.triangles).toBeLessThan(180_000);
     expect(metrics.calls).toBeLessThan(150);
-    expect(metrics.geometries).toBeLessThan(60);
+    expect(metrics.geometries).toBeLessThan(metrics.track === 'marina' ? 80 : 60);
   } else {
     expect(metrics.triangles).toBeLessThan(900_000);
     expect(metrics.calls).toBeLessThan(320);
@@ -225,8 +227,20 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   }
   expect(metrics.sceneDetails.startGridMarks).toBe(16);
   expect(metrics.sceneDetails.gantryLights).toBe(5);
-  expect(metrics.sceneDetails.instancedBatches).toBe(8);
-  expect(metrics.sceneDetails.totalInstances).toBeGreaterThan(isMobile ? 330 : 500);
+  expect(metrics.sceneDetails.instancedBatches).toBe(17);
+  expect(metrics.sceneDetails.totalInstances).toBeGreaterThan(isMobile ? 560 : 700);
+  expect(metrics.sceneDetails.validation).toMatchObject({
+    trackId: 'marina',
+    passed: true,
+    boatCount: 3,
+    waterFeatureCount: 1,
+    pitBuildingCount: 1,
+    floatingObjectCount: 0,
+    roadObstructionCount: 0,
+  });
+  expect(metrics.sceneDetails.validation.estimatedDetailScore).toBeGreaterThanOrEqual(80);
+  expect(metrics.sceneDetails.validation.marinaDockCount).toBeGreaterThanOrEqual(2);
+  expect(metrics.sceneDetails.validation.tracksidePropCount).toBeGreaterThanOrEqual(80);
   expect(metrics.assetKit.referenceImages.chassis).toContain('formula-chassis-reference.png');
   expect(metrics.assetStatus.generatedReady).toBe(true);
   expect(metrics.assetStatus.loaderDeferred).toBe(true);

@@ -7,7 +7,8 @@ Mobile-first Three.js formula racing game.
 - `npm run dev` starts the local game.
 - `npm run build` typechecks and builds.
 - `npm test` runs data/runtime tests.
-- `npm run screenshot` captures menu, gameplay, and asset-inspector artifacts.
+- `npm run screenshot` captures focused mobile/desktop menu and gameplay artifacts.
+- `npm run screenshot:full` runs the full browser regression suite, including asset inspector, campaign, replay, controls, and performance smokes.
 - `npm run audio:plan` refreshes the dry-run ElevenLabs audio manifest.
 - `npm run audio:check` verifies the ElevenLabs manifest and generated MP3 status.
 - `npm run audio:generate` generates ElevenLabs MP3s when all voice IDs and an API key are configured locally.
@@ -30,6 +31,8 @@ Keep ElevenLabs credentials outside git. The generator reads `ELEVENLABS_API_KEY
 - Five-red-light pre-race start sequence with announcer setup.
 - Queued Arthur/Mags caption exchanges for tutorial, track-specific pre-race, replay, podium, and finale beats.
 - Trackside atmosphere with Armco barriers, tire stacks, sponsor boards, pit wall, start grid marks, and a start gantry.
+- Marina Vista Circuit detail pass with docks, boats, water edge, coastal pit building, viewing platform, fencing, lights, service props, and validation metrics.
+- Focused screenshot artifact command with a separate full browser regression command for heavier validation.
 - Circuit readability markers with brake boards before kerb zones, side-specific red/white kerbs, and red apex posts at each turn complex.
 - World-space podium ceremony with staged top-three cars, winner celebration camera, and higher-confetti campaign finale.
 - Queued podium/finale announcer summaries that call out the winner, player finish, top three, and campaign standings.

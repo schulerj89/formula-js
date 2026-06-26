@@ -1527,7 +1527,9 @@ function exposeDebug(dt = 0): void {
     debugMetricTimer = 0.2;
   }
   const metrics = cachedDebugMetrics;
-  const debugText = `calls ${metrics.calls}\ntris ${metrics.triangles}\ngeos ${metrics.geometries}\ntex ${metrics.textures}\nfps ${metrics.estimatedFps}\nreplay ${metrics.replayFrames}`;
+  const validation = metrics.sceneDetails?.validation;
+  const envStatus = validation?.trackId === 'marina' ? (validation.passed ? 'pass' : 'fail') : 'n/a';
+  const debugText = `calls ${metrics.calls}\ntris ${metrics.triangles}\ngeos ${metrics.geometries}\ntex ${metrics.textures}\nfps ${metrics.estimatedFps}\nreplay ${metrics.replayFrames}\nenv ${envStatus}`;
   if (debug.textContent !== debugText) debug.textContent = debugText;
   debug.classList.toggle('active', debugOverlayEnabled());
   (window as any).__GRIDLINE_APEX__ = {

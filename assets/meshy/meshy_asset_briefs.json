@@ -1,0 +1,49 @@
+{
+  "kit": "marina-vista-optional-hero-assets",
+  "purpose": "Optional future Meshy replacements for procedural Marina Vista props. The game must keep procedural fallbacks for every required object.",
+  "style": "stylized low-poly mobile racing environment, clean silhouettes, bright coastal palette, isolated reusable props, no readable text, no logos",
+  "assets": [
+    {
+      "id": "marina-pit-building",
+      "fileName": "marina-pit-building.glb",
+      "targetPolycount": 3500,
+      "prompt": "stylized low-poly Formula racing marina pit building with garage doors, flat facade, coastal cream walls, teal roof, modular reusable prop, isolated asset, no readable text, no logo"
+    },
+    {
+      "id": "start-finish-gantry",
+      "fileName": "start-finish-gantry.glb",
+      "targetPolycount": 2200,
+      "prompt": "stylized low-poly Formula racing start finish gantry with five red lights and simple truss, clean mobile game silhouette, isolated prop, no readable text, no logo"
+    },
+    {
+      "id": "sponsor-sign-set",
+      "fileName": "sponsor-sign-set.glb",
+      "targetPolycount": 1600,
+      "prompt": "stylized low-poly racing sponsor sign set, blank colored boards, direction arrow shapes, reusable trackside props, isolated asset, no readable text, no logo"
+    },
+    {
+      "id": "stylized-boat-set",
+      "fileName": "stylized-boat-set.glb",
+      "targetPolycount": 3000,
+      "prompt": "three stylized low-poly marina boats, simple hulls and cabins, bright coastal colors, reusable background props, isolated asset, no readable text, no logo"
+    },
+    {
+      "id": "tire-wall-set",
+      "fileName": "tire-wall-set.glb",
+      "targetPolycount": 1800,
+      "prompt": "stylized low-poly racing tire wall barrier set, stackable black tires with simple strap bands, repeatable flat ends, isolated prop, no readable text, no logo"
+    },
+    {
+      "id": "marina-grandstand",
+      "fileName": "marina-grandstand.glb",
+      "targetPolycount": 3000,
+      "prompt": "stylized low-poly compact marina race grandstand viewing platform with shade canopy and railings, coastal color palette, isolated prop, no readable text, no logo"
+    },
+    {
+      "id": "track-light-set",
+      "fileName": "track-light-set.glb",
+      "targetPolycount": 1400,
+      "prompt": "stylized low-poly racing track light post set, slim poles with rectangular lamps, repeatable trackside prop, isolated asset, no readable text, no logo"
+    }
+  ]
+}

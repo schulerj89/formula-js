@@ -14,7 +14,7 @@ import { createPositionCommentary, createSpotterCommentary, pickActiveRaceEvent 
 import { createTrackMapLayout, summarizeRaceReadability } from '../src/game/raceReadability';
 import { applyCampaignResults, createCampaignObjective, createCampaignScores, evaluateCampaignObjective } from '../src/game/campaign';
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
-import { buildRaceScene, createPodiumCeremony, type SceneDetailLevel } from '../src/game/scene';
+import { buildRaceScene, createPodiumCeremony, validateTrackEnvironment, type SceneDetailLevel } from '../src/game/scene';
 import { TrackPath } from '../src/game/trackPath';
 import { animateDriverIdle, createFormulaCar, summarizeDriverRig } from '../src/game/models';
 import { createFormulaAssetManager } from '../src/game/formulaAssets';
@@ -125,10 +125,48 @@ describe('track data', () => {
           build.detailStats.brakeBoardPanels + build.detailStats.brakeBoardPosts + build.detailStats.apexPosts,
         );
         expect(build.detailStats.readabilityInstancedBatches).toBe(3);
-        expect(build.detailStats.instancedBatches).toBe(8);
-        expect(build.detailStats.totalInstances).toBeLessThan(detailLevel === 'full' ? 700 : detailLevel === 'balanced' ? 500 : 340);
+        expect(build.detailStats.instancedBatches).toBe(track.id === 'marina' ? 17 : 8);
+        expect(build.detailStats.totalInstances).toBeLessThan(
+          track.id === 'marina' ? (detailLevel === 'full' ? 1100 : detailLevel === 'balanced' ? 860 : 620) : detailLevel === 'full' ? 700 : detailLevel === 'balanced' ? 500 : 340,
+        );
       }
     }
+  });
+
+  it('validates Marina Vista detail density and rejects sparse blockout scenes', () => {
+    const marina = tracks.find((track) => track.id === 'marina')!;
+    const sparseScene = new THREE.Scene();
+    const sparseReport = validateTrackEnvironment(sparseScene, new TrackPath(marina), marina);
+    expect(sparseReport.passed).toBe(false);
+    expect(sparseReport.failureReasons).toContain('curbCount 0 < 60');
+    expect(sparseReport.estimatedDetailScore).toBeLessThan(80);
+
+    const scene = new THREE.Scene();
+    const build = buildRaceScene(scene, marina, [], undefined, 'balanced');
+    const report = build.detailStats.validation;
+
+    expect(report.passed).toBe(true);
+    expect(report).toMatchObject({
+      curbCount: expect.any(Number),
+      guardrailCount: 208,
+      brakingMarkerCount: 12,
+      sponsorSignCount: expect.any(Number),
+      startFinishGantryCount: 1,
+      pitBuildingCount: 1,
+      marinaDockCount: expect.any(Number),
+      boatCount: 3,
+      waterFeatureCount: 1,
+      floatingObjectCount: 0,
+      roadObstructionCount: 0,
+    });
+    expect(report.curbCount).toBeGreaterThanOrEqual(60);
+    expect(report.tireWallCount).toBeGreaterThanOrEqual(30);
+    expect(report.sponsorSignCount).toBeGreaterThanOrEqual(12);
+    expect(report.marinaDockCount).toBeGreaterThanOrEqual(2);
+    expect(report.vegetationCount).toBeGreaterThanOrEqual(50);
+    expect(report.tracksidePropCount).toBeGreaterThanOrEqual(80);
+    expect(report.landmarkCount).toBeGreaterThanOrEqual(1);
+    expect(report.estimatedDetailScore).toBeGreaterThanOrEqual(80);
   });
 
   it('retains shared procedural car geometries while disposing scene-owned resources on rebuild', () => {

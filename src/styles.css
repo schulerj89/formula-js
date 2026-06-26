@@ -1037,7 +1037,11 @@ p {
   }
 
   .caption {
-    bottom: 26px;
+    bottom: calc(112px + env(safe-area-inset-bottom));
+  }
+
+  .screen[data-screen="podium"].active ~ .caption {
+    bottom: max(18px, env(safe-area-inset-bottom));
   }
 
   .leaderboard ol {

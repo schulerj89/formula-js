@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.34.0 - 2026-06-26
+
+- Rebuilt Marina Vista Circuit with a denser procedural racing environment: marina water, docks, boats, coastal buildings, pit/paddock, viewing platform, fencing, lights, cones, crates, bollards, flags, and service props.
+- Added tagged environment metadata plus a Marina Vista validation report with required detail counts, floating-object checks, road-obstruction checks, scoring, and dev-console/debug exposure.
+- Added unit and browser coverage proving sparse Marina scenes fail validation while the rebuilt Marina gameplay scene passes.
+- Added optional Meshy future-asset briefs for higher-quality Marina hero props while keeping the current pass procedural.
+- Split focused screenshot artifact capture from the full Playwright regression suite so routine visual slices no longer take the full browser-smoke runtime.
+
 ## 1.33.1 - 2026-06-26
 
 - Removed rotating announcer speech from the title/menu screen so only menu music plays there.
