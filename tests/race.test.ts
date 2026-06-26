@@ -7,7 +7,7 @@ import { bodyPaintOptions, helmetPaintOptions } from '../src/data/customization'
 import { analyzeRaceAudio } from '../src/game/audio';
 import { createRace } from '../src/game/race';
 import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
-import { createReplayRecorder, findReplayFrame } from '../src/game/replay';
+import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
 import { TrackPath } from '../src/game/trackPath';
 import type { GameSettings } from '../src/types';
 
@@ -100,7 +100,43 @@ describe('replay recording', () => {
     expect(replay.frames.length).toBeLessThanOrEqual(12);
     expect(replay.estimatedBytes).toBeLessThan(10_000);
     expect(replay.droppedSamples).toBeGreaterThan(0);
+    expect(replay.events.length).toBeGreaterThanOrEqual(3);
+    expect(replay.events[0].speaker).toBe('Arthur Bell');
     expect(findReplayFrame(replay, 0.8)?.racers).toHaveLength(8);
+  });
+
+  it('creates compact replay highlight events for damage, tire wear, and finish calls', () => {
+    const events = createReplayEvents('Test Track', 'Test Driver', 30, [
+      { racerId: 'rival', name: 'Luca Venn', totalTime: 30, bestLap: 29, damage: 1, tires: 0.9 },
+      { racerId: 'player', name: 'Test Driver', totalTime: 31, bestLap: 30, damage: 0.6, tires: 0.65 },
+    ]);
+    expect(events.map((event) => event.kind)).toEqual(['opening', 'move', 'damage', 'tires', 'finish']);
+    expect(events.every((event, index) => index === 0 || event.time >= events[index - 1].time)).toBe(true);
+    expect(events.find((event) => event.kind === 'damage')?.speaker).toBe('Radio');
+    expect(events.find((event) => event.kind === 'finish')?.focusRacerId).toBe('rival');
+  });
+
+  it('keeps replay event times inside the retained frame window when samples drop', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    const recorder = createReplayRecorder(tracks[0].id, tracks[0].name, settings.playerName, 10, 5);
+    let snapshot = race.snapshot();
+    for (let i = 0; i < 80; i += 1) {
+      snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: 0.15 });
+      recorder.record(1 / 30, snapshot);
+    }
+    const replay = recorder.finalize([]);
+    expect(replay.droppedSamples).toBeGreaterThan(0);
+    expect(replay.frames[0].time).toBe(0);
+    expect(replay.duration).toBeLessThan(1);
+    expect(replay.events.every((event) => event.time <= replay.duration)).toBe(true);
+    expect(findReplayFrame(replay, replay.duration + 0.05)?.racers).toHaveLength(8);
+  });
+
+  it('counts replay highlight events in the replay byte estimate', () => {
+    const frames = [{ time: 0, racers: [{ id: 'player', progress: 0, lateral: 0, speed: 0, lap: 0 }] }];
+    const events = createReplayEvents('Test Track', 'Test Driver', 5, []);
+    expect(estimateReplayBytes(frames, events)).toBeGreaterThan(estimateReplayBytes(frames));
   });
 });
 

@@ -14,12 +14,23 @@ export interface ReplayFrame {
   racers: ReplayRacerFrame[];
 }
 
+export type ReplayEventKind = 'opening' | 'move' | 'damage' | 'tires' | 'finish';
+
+export interface ReplayHighlightEvent {
+  time: number;
+  kind: ReplayEventKind;
+  speaker: 'Arthur Bell' | 'Mags Whitlow' | 'Radio';
+  text: string;
+  focusRacerId?: string;
+}
+
 export interface RaceReplay {
   trackId: string;
   trackName: string;
   playerName: string;
   duration: number;
   frames: ReplayFrame[];
+  events: ReplayHighlightEvent[];
   results: RaceResult[];
   estimatedBytes: number;
   sampleRate: number;
@@ -64,14 +75,22 @@ export function createReplayRecorder(trackId: string, trackName: string, playerN
       });
     },
     finalize(results) {
+      const retainedStart = frames[0]?.time ?? 0;
+      const normalizedFrames = frames.map((frame) => ({
+        ...frame,
+        time: round(Math.max(0, frame.time - retainedStart)),
+      }));
+      const retainedDuration = Math.max(normalizedFrames[normalizedFrames.length - 1]?.time ?? 0, sampleInterval);
+      const events = createReplayEvents(trackName, playerName, retainedDuration, results);
       return {
         trackId,
         trackName,
         playerName,
-        duration: elapsed,
-        frames: [...frames],
+        duration: retainedDuration,
+        frames: normalizedFrames,
+        events,
         results,
-        estimatedBytes: estimateReplayBytes(frames),
+        estimatedBytes: estimateReplayBytes(normalizedFrames, events),
         sampleRate,
         droppedSamples,
       };
@@ -82,8 +101,13 @@ export function createReplayRecorder(trackId: string, trackName: string, playerN
   };
 }
 
-export function estimateReplayBytes(frames: ReplayFrame[]): number {
-  return frames.reduce((total, frame) => total + frameOverheadBytes + frame.racers.length * numbersPerRacerFrame * bytesPerNumber, 0);
+export function estimateReplayBytes(frames: ReplayFrame[], events: ReplayHighlightEvent[] = []): number {
+  const frameBytes = frames.reduce((total, frame) => total + frameOverheadBytes + frame.racers.length * numbersPerRacerFrame * bytesPerNumber, 0);
+  const eventBytes = events.reduce(
+    (total, event) => total + 32 + event.text.length * 2 + event.speaker.length * 2 + event.kind.length + (event.focusRacerId?.length ?? 0),
+    0,
+  );
+  return frameBytes + eventBytes;
 }
 
 export function findReplayFrame(replay: RaceReplay, elapsed: number): ReplayFrame | null {
@@ -95,6 +119,65 @@ export function findReplayFrame(replay: RaceReplay, elapsed: number): ReplayFram
     frame = candidate;
   }
   return frame;
+}
+
+export function createReplayEvents(trackName: string, playerName: string, duration: number, results: RaceResult[]): ReplayHighlightEvent[] {
+  const safeDuration = Math.max(0.001, duration);
+  const winner = results[0];
+  const playerResult = results.find((result) => result.racerId === 'player') ?? results[0];
+  const openingTime = boundedReplayTime(safeDuration, Math.min(0.25, safeDuration * 0.2));
+  const events: ReplayHighlightEvent[] = [
+    {
+      time: openingTime,
+      kind: 'opening',
+      speaker: 'Arthur Bell',
+      text: `${trackName} replay begins with ${playerName} launching into a very crowded bit of tarmac.`,
+      focusRacerId: 'player',
+    },
+    {
+      time: boundedReplayTime(safeDuration, safeDuration * 0.34),
+      kind: 'move',
+      speaker: 'Mags Whitlow',
+      text: 'Watch the middle sector here: confidence on entry, tiny correction, then full commitment on exit.',
+      focusRacerId: 'player',
+    },
+  ];
+
+  if (playerResult && playerResult.damage < 0.82) {
+    events.push({
+      time: boundedReplayTime(safeDuration, safeDuration * 0.55),
+      kind: 'damage',
+      speaker: 'Radio',
+      text: 'Replay confirms the damage warning. The outside kerb took a proper bite.',
+      focusRacerId: 'player',
+    });
+  }
+
+  if (playerResult && playerResult.tires < 0.72) {
+    events.push({
+      time: boundedReplayTime(safeDuration, safeDuration * 0.7),
+      kind: 'tires',
+      speaker: 'Arthur Bell',
+      text: 'The tyres were fading here, and every steering input started costing lap time.',
+      focusRacerId: 'player',
+    });
+  }
+
+  events.push({
+    time: boundedReplayTime(safeDuration, Math.max(openingTime, safeDuration - Math.min(0.45, safeDuration * 0.15))),
+    kind: 'finish',
+    speaker: winner?.racerId === 'player' ? 'Mags Whitlow' : 'Arthur Bell',
+    text: winner
+      ? `${winner.name} reaches the flag first. That is the replay headline, neat as you like.`
+      : 'The flag falls, and the replay has shown exactly where this race turned.',
+    focusRacerId: winner?.racerId,
+  });
+
+  return events.sort((a, b) => a.time - b.time);
+}
+
+function boundedReplayTime(duration: number, value: number): number {
+  return round(Math.min(Math.max(0, value), duration));
 }
 
 const round = (value: number): number => Math.round(value * 1000) / 1000;

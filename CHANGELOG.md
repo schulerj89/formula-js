@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 - 2026-06-26
+
+- Added compact replay highlight events with timed Arthur, Mags, and Radio captions during replay playback.
+- Extended replay byte accounting to include announcer event payloads.
+- Updated the replay screen to show announcer-call count alongside frame count and estimated size.
+- Added unit coverage for replay event ordering, damage calls, tire-wear calls, and finish commentary.
+
 ## 0.8.0 - 2026-06-26
 
 - Added active-race audio feedback with gear/rev engine telemetry, harmonic engine shaping, tire scrub cues, and kerb/off-track thumps.

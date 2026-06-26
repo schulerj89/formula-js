@@ -49,6 +49,10 @@ let uiBound = false;
 let replayRecorder: ReplayRecorder | null = null;
 let lastReplay: RaceReplay | null = null;
 let replayElapsed = 0;
+let replayWrappedElapsed = 0;
+let replayEventIndex = 0;
+let replayNextCaptionAt = 0;
+let replayFocusRacerId = 'player';
 let menuFlyoverIndex = 0;
 let menuFlyoverTimer = 0;
 let menuPreviewTrack = selectedTrack;
@@ -569,7 +573,10 @@ function rotateCaption(): void {
 }
 
 function showCaption(name: string, text: string): void {
-  caption.innerHTML = `<strong>${name}</strong> ${text}`;
+  caption.textContent = '';
+  const speaker = document.createElement('strong');
+  speaker.textContent = name;
+  caption.append(speaker, ` ${text}`);
   caption.classList.add('active');
   captionTimer = 5.5;
   audio.speak(name, text);
@@ -621,7 +628,7 @@ function showReplayScreen(): void {
   gameState = 'replay';
   showScreen('replay');
   root.querySelector<HTMLParagraphElement>('#replayText')!.textContent = lastReplay
-    ? `${lastReplay.trackName} replay: ${lastReplay.frames.length} frames, about ${Math.ceil(lastReplay.estimatedBytes / 1024)} KB.`
+    ? `${lastReplay.trackName} replay: ${lastReplay.frames.length} frames, ${lastReplay.events.length} announcer calls, about ${Math.ceil(lastReplay.estimatedBytes / 1024)} KB.`
     : 'No full replay saved yet. Run a race to create the highlight camera.';
   showCaption('Arthur Bell', fill(dialogue.replay[0][1]));
   if (lastReplay) startReplayPlayback();
@@ -636,6 +643,10 @@ function startReplayPlayback(): void {
   selectedTrack = track;
   sceneBuild = buildRaceScene(scene, track, buildRacers(), createSceneCar);
   replayElapsed = 0;
+  replayWrappedElapsed = 0;
+  replayEventIndex = 0;
+  replayNextCaptionAt = 0;
+  replayFocusRacerId = 'player';
   gameState = 'replay';
   showScreen(null);
   hud.classList.remove('active');
@@ -649,6 +660,7 @@ function updateReplayPlayback(dt: number): void {
     return;
   }
   replayElapsed += dt;
+  updateReplayEvents(lastReplay);
   const frame = findReplayFrame(lastReplay, replayElapsed);
   if (!frame) return;
   for (const racer of frame.racers) {
@@ -660,12 +672,27 @@ function updateReplayPlayback(dt: number): void {
     car.rotation.y = pose.yaw - racer.lateral * 0.015;
     animateDriverIdle(car, performance.now() * 0.001);
   }
-  const focus = frame.racers[0];
+  const focus = frame.racers.find((racer) => racer.id === replayFocusRacerId) ?? frame.racers[0];
   const pose = sceneBuild.path.poseAt(focus.progress, focus.lateral);
   const side = pose.normal.clone().multiplyScalar(16 * Math.sin(replayElapsed * 0.6));
   const back = pose.tangent.clone().multiplyScalar(-18);
   camera.position.lerp(pose.position.clone().add(side).add(back).add(new THREE.Vector3(0, 9, 0)), 0.08);
   camera.lookAt(pose.position.x, 1.5, pose.position.z);
+}
+
+function updateReplayEvents(replay: RaceReplay): void {
+  const wrapped = replay.duration > 0 ? replayElapsed % replay.duration : 0;
+  if (wrapped < replayWrappedElapsed) {
+    replayEventIndex = 0;
+    replayNextCaptionAt = 0;
+  }
+  replayWrappedElapsed = wrapped;
+  const event = replay.events[replayEventIndex];
+  if (!event || event.time > wrapped || wrapped < replayNextCaptionAt) return;
+  replayEventIndex += 1;
+  replayNextCaptionAt = wrapped + 4.4;
+  replayFocusRacerId = event.focusRacerId ?? replayFocusRacerId;
+  showCaption(event.speaker, event.text);
 }
 
 function currentControl(): RaceControl {
@@ -752,6 +779,9 @@ function exposeDebug(): void {
     track: selectedTrack.id,
     previewTrack: menuPreviewTrack.id,
     replayFrames: lastReplay?.frames.length ?? 0,
+    replayEvents: lastReplay?.events.length ?? 0,
+    replayEventIndex,
+    replayFocusRacerId,
     replayBytes: lastReplay?.estimatedBytes ?? 0,
     replayDroppedSamples: lastReplay?.droppedSamples ?? 0,
     replaySampleRate: lastReplay?.sampleRate ?? 0,
