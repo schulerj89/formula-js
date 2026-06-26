@@ -11,7 +11,7 @@ import { applyCampaignResults, campaignLeader, createCampaignScores, type Campai
 import { createFormulaAssetManager } from './game/formulaAssets';
 import { animateDriverIdle, summarizeDriverRig } from './game/models';
 import { createRace, createResults, type RaceControl, type RaceSnapshot } from './game/race';
-import { createPositionCommentary, type RaceCommentaryKind } from './game/raceCommentary';
+import { pickActiveRaceEvent, type RaceCommentaryKind } from './game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability, type TrackMapLayout } from './game/raceReadability';
 import { createReplayRecorder, findReplayFrame, type RaceReplay, type ReplayRecorder } from './game/replay';
 import { buildRaceScene, createPodiumCeremony, type PodiumCeremonyStats, type SceneBuild } from './game/scene';
@@ -51,7 +51,10 @@ let raceCommentaryElapsed = 0;
 let lastCommentaryPosition: number | null = null;
 let lastRaceCommentaryAt = -999;
 let raceCommentaryCallouts = 0;
+let spotterCallouts = 0;
 let raceCommentarySuppressedByCooldown = 0;
+let raceCommentarySuppressedByDedupe = 0;
+let lastRaceEventSignature: string | null = null;
 let lastRaceCommentaryKind: RaceCommentaryKind | null = null;
 let lastRaceCommentaryLineId: string | null = null;
 let lastRaceCommentaryPriority: number | null = null;
@@ -420,8 +423,7 @@ function update(dt: number): void {
       updateCars(latestSnapshot);
       updateRaceCamera(latestSnapshot);
       updateHud(latestSnapshot);
-      updateRaceCommentary(latestSnapshot);
-      updateRadio(latestSnapshot);
+      updateRaceAnnouncements(latestSnapshot);
       replayRecorder?.record(dt, latestSnapshot);
       audio.updateRaceFeedback(latestSnapshot, activeControl, dt);
       if (latestSnapshot.complete) finishRace(latestSnapshot);
@@ -460,7 +462,10 @@ function startPreRace(): void {
   lastCommentaryPosition = null;
   lastRaceCommentaryAt = -999;
   raceCommentaryCallouts = 0;
+  spotterCallouts = 0;
   raceCommentarySuppressedByCooldown = 0;
+  raceCommentarySuppressedByDedupe = 0;
+  lastRaceEventSignature = null;
   lastRaceCommentaryKind = null;
   lastRaceCommentaryLineId = null;
   lastRaceCommentaryPriority = null;
@@ -704,43 +709,39 @@ function updateTrackMap(snapshot: RaceSnapshot): void {
   raceHint.className = summary.sideBySide ? 'danger' : summary.brakeUrgency;
 }
 
-function updateRadio(snapshot: RaceSnapshot): void {
-  const contactWarning = snapshot.player.contactEvents > lastContactRadioEvent && snapshot.player.lastContactSeverity > 0.22;
-  const warnings: Array<[string, string]> = [
-    ['damage', snapshot.player.damage < 0.45 ? 'Radio' : ''],
-    ['tires', snapshot.player.tires < 0.38 ? 'Radio' : ''],
-  ];
-  const damageWarning = warnings[0][1] && lastRadio !== 'damage';
-  const tireWarning = warnings[1][1] && lastRadio !== 'tires';
-  if (contactWarning) {
-    lastContactRadioEvent = snapshot.player.contactEvents;
-    lastRadio = 'contact';
-    showCaption('Radio', 'Contact confirmed. Check the front wing and give them space.');
-  } else if (damageWarning) {
-    lastRadio = 'damage';
-    showCaption('Radio', 'Damage is climbing. Stay off the outside kerbs and bring it home.');
-  } else if (tireWarning) {
-    lastRadio = 'tires';
-    showCaption('Radio', 'Tyres are fading. Brake earlier and keep the steering smooth.');
-  }
-}
-
-function updateRaceCommentary(snapshot: RaceSnapshot, force = false): void {
+function updateRaceAnnouncements(snapshot: RaceSnapshot, force = false): void {
   const previousPosition = lastCommentaryPosition;
   lastCommentaryPosition = snapshot.position;
-  const event = createPositionCommentary(previousPosition, snapshot, settings.playerName);
+  const summary = summarizeRaceReadability(snapshot, selectedTrack);
+  const event = pickActiveRaceEvent({
+    previousPosition,
+    snapshot,
+    summary,
+    playerName: settings.playerName,
+    lastRadio,
+    lastContactRadioEvent,
+  });
   if (!event) return;
-  if (!force && (raceCommentaryElapsed < 3.5 || raceCommentaryElapsed - lastRaceCommentaryAt < 4.4)) {
+  const eventSignature = `${event.lineId}:${event.focusRacerId ?? 'none'}`;
+  if (!force && event.priority < 4 && eventSignature === lastRaceEventSignature && raceCommentaryElapsed - lastRaceCommentaryAt < 7.5) {
+    raceCommentarySuppressedByDedupe += 1;
+    return;
+  }
+  if (!force && event.priority < 4 && (raceCommentaryElapsed < 3.5 || raceCommentaryElapsed - lastRaceCommentaryAt < 4.4)) {
     raceCommentarySuppressedByCooldown += 1;
     return;
   }
   raceCommentaryCallouts += 1;
+  if (event.kind === 'spotter-side' || event.kind === 'spotter-closing') spotterCallouts += 1;
   lastRaceCommentaryAt = raceCommentaryElapsed;
+  lastRaceEventSignature = eventSignature;
   lastRaceCommentaryKind = event.kind;
   lastRaceCommentaryLineId = event.lineId;
   lastRaceCommentaryPriority = event.priority;
   lastRaceCommentarySpeaker = event.speaker;
   lastRaceCommentaryFocusRacerId = event.focusRacerId;
+  if (event.radioKey === 'contact') lastContactRadioEvent = snapshot.player.contactEvents;
+  if (event.radioKey) lastRadio = event.radioKey;
   showCaption(event.speaker, event.text);
 }
 
@@ -863,7 +864,54 @@ function forcePositionGainForSmoke(): void {
   player.progress = (0.985 + player.distance) % 1;
   player.speed = Math.max(player.speed, passedRival.speed + 2);
   const standings = [...latestSnapshot.racers].sort((a, b) => b.distance - a.distance);
-  updateRaceCommentary({
+  updateRaceAnnouncements({
+    ...latestSnapshot,
+    standings,
+    position: standings.findIndex((racer) => racer.definition.id === playerTemplate.id) + 1,
+  }, true);
+}
+
+function forceSideThreatForSmoke(): void {
+  if (!latestSnapshot || gameState !== 'race') return;
+  const rival = latestSnapshot.racers.find((racer) => racer.definition.id !== playerTemplate.id && !racer.finished);
+  if (!rival) return;
+  const player = latestSnapshot.player;
+  player.distance = Math.max(player.distance, 0.2);
+  player.progress = (0.985 + player.distance) % 1;
+  player.lateral = -0.2;
+  player.speed = Math.max(player.speed, 52);
+  rival.distance = player.distance + 0.004;
+  rival.progress = (0.985 - 0.006 + rival.distance) % 1;
+  rival.lateral = 1.35;
+  rival.speed = Math.max(rival.speed, player.speed + 3);
+  const standings = [...latestSnapshot.racers].sort((a, b) => b.distance - a.distance);
+  updateRaceAnnouncements({
+    ...latestSnapshot,
+    standings,
+    position: standings.findIndex((racer) => racer.definition.id === playerTemplate.id) + 1,
+  }, true);
+}
+
+function forceAnnouncementConflictForSmoke(): void {
+  if (!latestSnapshot || gameState !== 'race') return;
+  const rival = latestSnapshot.racers.find((racer) => racer.definition.id !== playerTemplate.id && !racer.finished);
+  if (!rival) return;
+  const player = latestSnapshot.player;
+  lastCommentaryPosition = Math.min(latestSnapshot.standings.length, latestSnapshot.position + 1);
+  player.distance = Math.max(player.distance, 0.24);
+  player.progress = (0.985 + player.distance) % 1;
+  player.lateral = -0.1;
+  player.speed = Math.max(player.speed, 54);
+  player.contactEvents += 1;
+  player.lastContactSeverity = 0.62;
+  player.maxContactSeverity = Math.max(player.maxContactSeverity, 0.62);
+  player.lastContactRacerId = rival.definition.id;
+  rival.distance = player.distance + 0.004;
+  rival.progress = (0.985 - 0.006 + rival.distance) % 1;
+  rival.lateral = 1.2;
+  rival.speed = Math.max(rival.speed, player.speed + 3);
+  const standings = [...latestSnapshot.racers].sort((a, b) => b.distance - a.distance);
+  updateRaceAnnouncements({
     ...latestSnapshot,
     standings,
     position: standings.findIndex((racer) => racer.definition.id === playerTemplate.id) + 1,
@@ -1108,7 +1156,9 @@ function exposeDebug(): void {
     },
     raceCommentary: {
       callouts: raceCommentaryCallouts,
+      spotterCallouts,
       suppressedByCooldown: raceCommentarySuppressedByCooldown,
+      suppressedByDedupe: raceCommentarySuppressedByDedupe,
       lastKind: lastRaceCommentaryKind,
       lastLineId: lastRaceCommentaryLineId,
       lastPriority: lastRaceCommentaryPriority,
@@ -1145,6 +1195,8 @@ function exposeDebug(): void {
       forcePodium: forcePodiumForSmoke,
       forceContact: forceContactForSmoke,
       forcePositionGain: forcePositionGainForSmoke,
+      forceSideThreat: forceSideThreatForSmoke,
+      forceAnnouncementConflict: forceAnnouncementConflictForSmoke,
     },
   };
 }

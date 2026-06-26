@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.0 - 2026-06-26
+
+- Added active-race spotter calls for side-by-side threats and fast-closing traffic.
+- Added a single active-race announcement arbiter so contact/damage/tire radio beats spotter calls, and spotter calls beat normal position chatter.
+- Added deterministic debug hooks and metrics for spotter callouts, dedupe suppression, and same-frame announcement conflicts.
+- Added unit and browser smoke coverage for event kinds, priorities, line IDs, focus racers, and critical-radio conflict resolution.
+
 ## 1.7.0 - 2026-06-26
 
 - Added a shared customizable driver rig with named helmet, visor, and celebration arm parts.

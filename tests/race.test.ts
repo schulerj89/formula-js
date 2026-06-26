@@ -7,7 +7,7 @@ import { bodyPaintOptions, helmetPaintOptions } from '../src/data/customization'
 import { elevenLabsSongAssets, elevenLabsVoiceAssets, matchVoiceAsset } from '../src/data/elevenlabs';
 import { analyzeRaceAudio, RaceAudio } from '../src/game/audio';
 import { analyzeCarContact, analyzeCpuRacecraft, createRace, type RacerState } from '../src/game/race';
-import { createPositionCommentary } from '../src/game/raceCommentary';
+import { createPositionCommentary, createSpotterCommentary, pickActiveRaceEvent } from '../src/game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability } from '../src/game/raceReadability';
 import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
@@ -350,6 +350,88 @@ describe('race simulation', () => {
     expect(event?.lineId).toBe('mags.position-gained.clean-pass');
     expect(event?.priority).toBe(2);
     expect(event?.speaker).toBe('Mags Whitlow');
+    expect(event?.focusRacerId).toBe('cpu-1');
+  });
+
+  it('prioritizes side-by-side spotter commentary over normal race calls', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    const snapshot = race.snapshot();
+    snapshot.player.distance = 0.2;
+    snapshot.player.progress = 0.2;
+    snapshot.player.speed = 55;
+    snapshot.player.lateral = -0.2;
+    snapshot.racers[1].distance = 0.204;
+    snapshot.racers[1].progress = 0.204;
+    snapshot.racers[1].speed = 58;
+    snapshot.racers[1].lateral = 1.3;
+    const standings = [...snapshot.racers].sort((a, b) => b.distance - a.distance);
+    const crafted = { ...snapshot, standings, position: standings.findIndex((racer) => racer.definition.id === 'player') + 1 };
+    const summary = summarizeRaceReadability(crafted, tracks[0]);
+
+    const event = createSpotterCommentary(summary);
+
+    expect(event?.kind).toBe('spotter-side');
+    expect(event?.lineId).toBe('radio.spotter-side.right');
+    expect(event?.priority).toBe(3);
+    expect(event?.speaker).toBe('Radio');
+    expect(event?.focusRacerId).toBe('cpu-1');
+  });
+
+  it('arbitrates critical contact radio above spotter and position calls', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    const snapshot = race.snapshot();
+    snapshot.player.distance = 0.2;
+    snapshot.player.progress = 0.2;
+    snapshot.player.speed = 55;
+    snapshot.player.lateral = -0.2;
+    snapshot.player.contactEvents = 1;
+    snapshot.player.lastContactSeverity = 0.6;
+    snapshot.player.lastContactRacerId = 'cpu-1';
+    snapshot.racers[1].distance = 0.204;
+    snapshot.racers[1].progress = 0.204;
+    snapshot.racers[1].speed = 58;
+    snapshot.racers[1].lateral = 1.3;
+    const standings = [...snapshot.racers].sort((a, b) => b.distance - a.distance);
+    const crafted = { ...snapshot, standings, position: standings.findIndex((racer) => racer.definition.id === 'player') + 1 };
+    const summary = summarizeRaceReadability(crafted, tracks[0]);
+
+    const event = pickActiveRaceEvent({
+      previousPosition: 2,
+      snapshot: crafted,
+      summary,
+      playerName: settings.playerName,
+      lastRadio: '',
+      lastContactRadioEvent: 0,
+    });
+
+    expect(event?.kind).toBe('radio-contact');
+    expect(event?.lineId).toBe('radio.contact.damage-check');
+    expect(event?.priority).toBe(4);
+    expect(event?.speaker).toBe('Radio');
+    expect(event?.focusRacerId).toBe('cpu-1');
+  });
+
+  it('creates stable spotter commentary for fast closing traffic', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    const snapshot = race.snapshot();
+    snapshot.player.distance = 0.2;
+    snapshot.player.progress = 0.2;
+    snapshot.player.speed = 45;
+    snapshot.racers[1].distance = 0.194;
+    snapshot.racers[1].progress = 0.194;
+    snapshot.racers[1].speed = 58;
+    const standings = [...snapshot.racers].sort((a, b) => b.distance - a.distance);
+    const crafted = { ...snapshot, standings, position: standings.findIndex((racer) => racer.definition.id === 'player') + 1 };
+    const summary = summarizeRaceReadability(crafted, tracks[0]);
+
+    const event = createSpotterCommentary(summary);
+
+    expect(event?.kind).toBe('spotter-closing');
+    expect(event?.lineId).toBe('radio.spotter-closing.behind');
+    expect(event?.priority).toBe(3);
     expect(event?.focusRacerId).toBe('cpu-1');
   });
 
