@@ -46,6 +46,9 @@ export interface RaceControl {
   steer: number;
 }
 
+export const TRACK_EDGE_BOUNDARY = 5.35;
+const OFF_TRACK_SLOWDOWN_START = 4.8;
+
 export interface RaceSnapshot {
   racers: RacerState[];
   player: RacerState;
@@ -99,6 +102,7 @@ export function createRace(
       } else {
         updateCpu(state, i, dt, track, states);
       }
+      applyTrackBoundaryResponse(state, dt, settings, i === 0 ? 1 : 0.65);
 
       const lapDistance = Math.max(0, state.speed * dt / (track.lengthKm * 1000));
       const previousLap = Math.floor(state.distance);
@@ -117,6 +121,7 @@ export function createRace(
       }
     }
     applyCarContacts(states, track, settings);
+    for (const state of states) applyTrackBoundaryResponse(state, dt, settings, 0.45);
 
     return snapshot();
   };
@@ -156,7 +161,7 @@ function updatePlayer(state: RacerState, control: RaceControl, dt: number, setti
   state.speed += (throttle - brake - drag) * dt;
   state.speed = clamp(state.speed, 0, 82);
   state.lateral += control.steer * dt * handling.steeringResponse * Math.max(0.25, state.speed / 60);
-  const offTrack = Math.max(0, Math.abs(state.lateral) - 4.8);
+  const offTrack = Math.max(0, Math.abs(state.lateral) - OFF_TRACK_SLOWDOWN_START);
   if (offTrack > 0) {
     state.speed *= 1 - Math.min(0.65, offTrack * dt * 0.7);
     if (settings.realisticDamage) state.damage = Math.max(0, state.damage - offTrack * dt * 0.025);
@@ -168,6 +173,18 @@ function updatePlayer(state: RacerState, control: RaceControl, dt: number, setti
   }
   const conditionLimit = 82 * (0.55 + state.damage * 0.45) * (0.72 + state.tires * 0.28);
   state.speed = Math.min(state.speed, conditionLimit);
+}
+
+function applyTrackBoundaryResponse(state: RacerState, dt: number, settings: GameSettings, severityScale: number): void {
+  const boundaryExcess = Math.abs(state.lateral) - TRACK_EDGE_BOUNDARY;
+  if (boundaryExcess <= 0) return;
+  const side = Math.sign(state.lateral) || 1;
+  const severity = clamp(boundaryExcess / 1.25 + state.speed / 150, 0.1, 1) * severityScale;
+  state.lateral = side * TRACK_EDGE_BOUNDARY;
+  state.speed *= 1 - Math.min(0.72, 0.32 + severity * 0.36);
+  state.lastContactSeverity = Math.max(state.lastContactSeverity, Math.round(severity * 1000) / 1000);
+  state.maxContactSeverity = Math.max(state.maxContactSeverity, state.lastContactSeverity);
+  if (settings.realisticDamage) state.damage = Math.max(0, state.damage - severity * dt * 0.12);
 }
 
 export function analyzePlayerHandling(

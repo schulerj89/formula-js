@@ -9,12 +9,12 @@ import { dialogue } from '../src/data/dialogue';
 import { elevenLabsSongAssets, elevenLabsVoiceAssets, matchVoiceAsset } from '../src/data/elevenlabs';
 import { analyzeRaceAudio, RaceAudio } from '../src/game/audio';
 import elevenLabsManifest from '../public/audio/elevenlabs/manifest.json';
-import { analyzeCarContact, analyzeCpuRacecraft, analyzePlayerHandling, createRace, type RacerState } from '../src/game/race';
+import { analyzeCarContact, analyzeCpuRacecraft, analyzePlayerHandling, createRace, TRACK_EDGE_BOUNDARY, type RacerState } from '../src/game/race';
 import { createPositionCommentary, createSpotterCommentary, pickActiveRaceEvent } from '../src/game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability } from '../src/game/raceReadability';
 import { applyCampaignResults, createCampaignObjective, createCampaignScores, evaluateCampaignObjective } from '../src/game/campaign';
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
-import { buildRaceScene, createPodiumCeremony, validateTrackEnvironment, type SceneDetailLevel } from '../src/game/scene';
+import { buildRaceScene, createPodiumCeremony, DRIVABLE_HALF_WIDTH, validateTrackEnvironment, type EnvironmentCategory, type SceneDetailLevel } from '../src/game/scene';
 import { TrackPath } from '../src/game/trackPath';
 import { animateDriverIdle, createFormulaCar, summarizeDriverRig } from '../src/game/models';
 import { createFormulaAssetManager } from '../src/game/formulaAssets';
@@ -33,6 +33,14 @@ const settings: GameSettings = {
   bodyPaint: 'scarlet',
   helmetPaint: 'ivory',
 };
+
+function tagValidationTestObject(object: THREE.Object3D, category: EnvironmentCategory, validationRadius: number, allowRoadOverlap = false): void {
+  object.userData.category = category;
+  object.userData.validationTags = ['test'];
+  object.userData.validationCount = 1;
+  object.userData.validationRadius = validationRadius;
+  object.userData.allowRoadOverlap = allowRoadOverlap;
+}
 
 function createFakeAudioContext(): AudioContext {
   const createAudioParam = () => ({
@@ -167,6 +175,56 @@ describe('track data', () => {
     expect(report.tracksidePropCount).toBeGreaterThanOrEqual(80);
     expect(report.landmarkCount).toBeGreaterThanOrEqual(1);
     expect(report.estimatedDetailScore).toBeGreaterThanOrEqual(80);
+  });
+
+  it('rejects trackside footprints that overlap the protected road zone even when centers are outside asphalt', () => {
+    const marina = tracks.find((track) => track.id === 'marina')!;
+    const path = new TrackPath(marina);
+    const scene = new THREE.Scene();
+    const pose = path.poseAt(0.24, DRIVABLE_HALF_WIDTH + 0.1);
+    const guardrail = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial());
+    guardrail.name = 'test-overlapping-guardrail';
+    guardrail.position.copy(pose.position);
+    guardrail.position.y = 0.5;
+    tagValidationTestObject(guardrail, 'guardrail', 1);
+    scene.add(guardrail);
+
+    const report = validateTrackEnvironment(scene, path, marina);
+
+    expect(report.roadObstructionCount).toBeGreaterThan(0);
+    expect(report.guardrailIntrusionCount).toBe(1);
+    expect(report.roadObstructions[0]).toMatchObject({
+      category: 'guardrail',
+      name: 'test-overlapping-guardrail',
+      radius: 1,
+    });
+  });
+
+  it('allows shallow curb edge overlap but rejects curbs placed deep inside the road', () => {
+    const marina = tracks.find((track) => track.id === 'marina')!;
+    const path = new TrackPath(marina);
+    const curbRadius = 0.36;
+    const createCurbReport = (lateralOffset: number) => {
+      const scene = new THREE.Scene();
+      const pose = path.poseAt(0.28, lateralOffset);
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.12, 1.8), new THREE.MeshBasicMaterial());
+      curb.name = `test-curb-${lateralOffset}`;
+      curb.position.copy(pose.position);
+      curb.position.y = 0.1;
+      tagValidationTestObject(curb, 'track_curb', curbRadius);
+      scene.add(curb);
+      return validateTrackEnvironment(scene, path, marina);
+    };
+
+    const legalEdgeReport = createCurbReport(DRIVABLE_HALF_WIDTH + curbRadius - 0.18);
+    const deepIntrusionReport = createCurbReport(DRIVABLE_HALF_WIDTH - 0.2);
+
+    expect(legalEdgeReport.curbIntrusionCount).toBe(0);
+    expect(deepIntrusionReport.curbIntrusionCount).toBe(1);
+    expect(deepIntrusionReport.curbIntrusions[0]).toMatchObject({
+      category: 'track_curb',
+      radius: curbRadius,
+    });
   });
 
   it('retains shared procedural car geometries while disposing scene-owned resources on rebuild', () => {
@@ -674,6 +732,22 @@ describe('race simulation', () => {
     expect(snapshot.player.distance).toBe(0);
     expect(snapshot.player.lap).toBe(0);
     expect(snapshot.player.finished).toBe(false);
+  });
+
+  it('clamps and slows cars that exceed the hard track-edge boundary', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    const initial = race.snapshot();
+    initial.player.lateral = TRACK_EDGE_BOUNDARY + 1.2;
+    initial.player.speed = 64;
+    initial.player.damage = 1;
+
+    const snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: 1 });
+
+    expect(Math.abs(snapshot.player.lateral)).toBeLessThanOrEqual(TRACK_EDGE_BOUNDARY);
+    expect(snapshot.player.speed).toBeLessThan(64);
+    expect(snapshot.player.damage).toBeLessThan(1);
+    expect(snapshot.player.maxContactSeverity).toBeGreaterThan(0);
   });
 
   it('requires a plausible driven lap before completing time attack', () => {
