@@ -14,6 +14,7 @@ import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findRepl
 import { createPodiumCeremony } from '../src/game/scene';
 import { TrackPath } from '../src/game/trackPath';
 import { animateDriverIdle, createFormulaCar, summarizeDriverRig } from '../src/game/models';
+import { createFinaleCommentary, createRacePodiumCommentary } from '../src/game/podiumCommentary';
 import type { GameSettings } from '../src/types';
 
 const settings: GameSettings = {
@@ -195,6 +196,37 @@ describe('audio data', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('keeps generated voice playback single-channel', async () => {
+    const audio = new RaceAudio({ ...settings, mute: false });
+    const firstVoice = {
+      currentTime: 12,
+      pause: vi.fn(),
+      play: vi.fn(() => Promise.resolve()),
+    } as unknown as HTMLAudioElement;
+    const secondVoice = {
+      currentTime: 0,
+      pause: vi.fn(),
+      play: vi.fn(() => Promise.resolve()),
+    } as unknown as HTMLAudioElement;
+    const internals = audio as unknown as {
+      loadedVoices: Map<string, HTMLAudioElement>;
+    };
+    internals.loadedVoices.set('mags-lights', firstVoice);
+    internals.loadedVoices.set('radio-damage', secondVoice);
+
+    audio.speak('Mags Whitlow', 'Five red lights, then it is noise, nerves, and no excuses.');
+    audio.speak('Radio', 'Damage is climbing. Stay off the outside kerbs and bring it home.');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const metrics = audio.metrics();
+    expect(firstVoice.pause).toHaveBeenCalledOnce();
+    expect(firstVoice.currentTime).toBe(0);
+    expect(secondVoice.play).toHaveBeenCalledOnce();
+    expect(metrics.assets.generatedSpeechEvents).toBe(1);
+    expect(metrics.assets.activeGeneratedVoice).toBe('radio-damage');
   });
 });
 
@@ -644,5 +676,43 @@ describe('campaign scoring', () => {
     expect(next[0].wins).toBe(1);
     expect(next[1].points).toBe(18);
     expect(next[2].podiums).toBe(1);
+  });
+});
+
+describe('podium commentary', () => {
+  it('summarizes race winner, player result, and campaign standings', () => {
+    const results = [
+      { racerId: 'player', name: 'Test Driver', totalTime: 82, bestLap: 26, damage: 0.9, tires: 0.8 },
+      { racerId: 'cpu-1', name: 'Luca Venn', totalTime: 84, bestLap: 27, damage: 0.9, tires: 0.8 },
+      { racerId: 'cpu-2', name: 'Maya Cross', totalTime: 85, bestLap: 27.4, damage: 0.9, tires: 0.8 },
+    ];
+    const scores = [
+      { racerId: 'player', name: 'Test Driver', points: 43, wins: 1, podiums: 2, lastFinish: 1 },
+      { racerId: 'cpu-1', name: 'Luca Venn', points: 36, wins: 1, podiums: 2, lastFinish: 2 },
+    ];
+
+    const events = createRacePodiumCommentary(results, settings.playerName, scores);
+
+    expect(events.map((event) => event.kind)).toEqual(['race-winner', 'player-result', 'campaign-standings']);
+    expect(events[0].lineId).toBe('arthur.podium.winner');
+    expect(events[0].text).toContain('Test Driver wins');
+    expect(events[1].lineId).toBe('mags.podium.player-win');
+    expect(events[1].focusRacerId).toBe('player');
+    expect(events[2].text).toContain('leads Luca Venn by 7 points');
+  });
+
+  it('summarizes campaign finale champion and top three', () => {
+    const scores = [
+      { racerId: 'player', name: 'Test Driver', points: 96, wins: 3, podiums: 4, lastFinish: 1 },
+      { racerId: 'cpu-1', name: 'Luca Venn', points: 88, wins: 1, podiums: 3, lastFinish: 2 },
+      { racerId: 'cpu-2', name: 'Maya Cross', points: 80, wins: 0, podiums: 2, lastFinish: 3 },
+    ];
+
+    const events = createFinaleCommentary(scores, settings.playerName, 4);
+
+    expect(events.map((event) => event.kind)).toEqual(['finale-champion', 'finale-top-three']);
+    expect(events[0].lineId).toBe('arthur.finale.champion');
+    expect(events[0].text).toContain('Test Driver is champion after 4 races');
+    expect(events[1].text).toContain('Test Driver, Luca Venn, then Maya Cross');
   });
 });

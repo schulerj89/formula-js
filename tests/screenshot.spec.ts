@@ -133,6 +133,11 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(podiumMetrics.podium.parkedCarCount).toBe(5);
   expect(podiumMetrics.podium.stats.platforms).toBe(3);
   expect(podiumMetrics.podium.stats.confettiPieces).toBe(90);
+  expect(podiumMetrics.podiumCommentary.eventCount).toBeGreaterThanOrEqual(3);
+  expect(podiumMetrics.podiumCommentary.lastKind).toBe('race-winner');
+  expect(podiumMetrics.podiumCommentary.lastLineId).toBe('arthur.podium.winner');
+  expect(podiumMetrics.podiumCommentary.lastFocusRacerId).toBe('player');
+  expect(podiumMetrics.caption.text).toContain('Rookie wins it');
   expect(podiumMetrics.driverRig.visibleCars).toBe(3);
   expect(podiumMetrics.driverRig.podiumCelebratingRacerId).toBe('player');
 
@@ -145,6 +150,10 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(finaleMetrics.podium.stats.confettiPieces).toBeGreaterThan(podiumMetrics.podium.stats.confettiPieces);
   expect(finaleMetrics.podium.stagedCarCount).toBe(3);
   expect(finaleMetrics.podium.parkedCarCount).toBe(5);
+  expect(finaleMetrics.podiumCommentary.eventCount).toBeGreaterThanOrEqual(2);
+  expect(finaleMetrics.podiumCommentary.lastKind).toBe('finale-champion');
+  expect(finaleMetrics.podiumCommentary.lastLineId).toBe('arthur.finale.champion');
+  expect(finaleMetrics.caption.text).toContain('Rookie is champion after 4 races');
   expect(finaleMetrics.driverRig.visibleCars).toBe(3);
   expect(finaleMetrics.driverRig.podiumCelebratingRacerId).toBe('player');
 });

@@ -10,6 +10,7 @@ import { RaceAudio } from './game/audio';
 import { applyCampaignResults, campaignLeader, createCampaignScores, type CampaignScore } from './game/campaign';
 import { createFormulaAssetManager } from './game/formulaAssets';
 import { animateDriverIdle, summarizeDriverRig } from './game/models';
+import { createFinaleCommentary, createRacePodiumCommentary, type PodiumCommentaryEvent, type PodiumCommentaryKind } from './game/podiumCommentary';
 import { createRace, createResults, type RaceControl, type RaceSnapshot } from './game/race';
 import { pickActiveRaceEvent, type RaceCommentaryKind } from './game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability, type TrackMapLayout } from './game/raceReadability';
@@ -43,6 +44,8 @@ let results: RaceResult[] = [];
 let campaignScores: CampaignScore[] = [];
 let captionTimer = 0;
 let captionIndex = 0;
+let lastCaptionSpeaker: string | null = null;
+let lastCaptionText: string | null = null;
 let lightTimer = 0;
 let lightsOn = 0;
 let lastRadio = '';
@@ -75,6 +78,12 @@ let podiumFocusId: string | null = null;
 let podiumTopThreeIds: string[] = [];
 let podiumStagedCarCount = 0;
 let podiumParkedCarCount = 0;
+let podiumCommentaryEvents: PodiumCommentaryEvent[] = [];
+let podiumCommentaryIndex = 0;
+let lastPodiumCommentaryKind: PodiumCommentaryKind | null = null;
+let lastPodiumCommentaryLineId: string | null = null;
+let lastPodiumCommentarySpeaker: string | null = null;
+let lastPodiumCommentaryFocusRacerId: string | null = null;
 let menuFlyoverIndex = 0;
 let menuFlyoverTimer = 0;
 let menuPreviewTrack = selectedTrack;
@@ -431,11 +440,13 @@ function update(dt: number): void {
   } else if (gameState === 'podium') {
     audio.playMusic(musicThemes.podium, dt);
     updatePodiumCamera(dt, false);
+    updatePodiumCommentary();
   } else if (gameState === 'replay') {
     updateReplayPlayback(dt);
   } else if (gameState === 'finale') {
     audio.playMusic(musicThemes.finale, dt);
     updatePodiumCamera(dt, true);
+    updatePodiumCommentary();
   }
 
   captionTimer -= dt;
@@ -526,7 +537,7 @@ function finishRace(snapshot: RaceSnapshot): void {
   hud.classList.remove('active');
   showScreen('podium');
   renderPodium();
-  showCaption('Arthur Bell', fill(dialogue.podium[0][1]));
+  startPodiumCommentary(createRacePodiumCommentary(results, settings.playerName, campaignScores));
 }
 
 function buildRacers(): RacerDefinition[] {
@@ -539,6 +550,7 @@ function loadMenuScene(): void {
   podiumGroup = null;
   podiumStats = null;
   podiumFocusId = null;
+  clearPodiumCommentary();
   menuPreviewTrack = selectedTrack;
   menuFlyoverIndex = tracks.findIndex((track) => track.id === selectedTrack.id);
   menuFlyoverTimer = 7;
@@ -758,6 +770,8 @@ function showCaption(name: string, text: string): void {
   speaker.textContent = name;
   caption.append(speaker, ` ${text}`);
   caption.classList.add('active');
+  lastCaptionSpeaker = name;
+  lastCaptionText = text;
   captionTimer = 5.5;
   audio.speak(name, text);
 }
@@ -789,8 +803,37 @@ function renderCampaignStandings(): void {
   `;
 }
 
+function startPodiumCommentary(events: PodiumCommentaryEvent[]): void {
+  podiumCommentaryEvents = events.length ? events : [{ kind: 'race-winner', lineId: 'arthur.podium.generic', speaker: 'Arthur Bell', text: fill(dialogue.podium[0][1]), focusRacerId: podiumFocusId }];
+  podiumCommentaryIndex = 0;
+  showNextPodiumCommentary();
+}
+
+function updatePodiumCommentary(): void {
+  if (captionTimer <= 0) showNextPodiumCommentary();
+}
+
+function showNextPodiumCommentary(): void {
+  const event = podiumCommentaryEvents[podiumCommentaryIndex];
+  if (!event) return;
+  podiumCommentaryIndex += 1;
+  lastPodiumCommentaryKind = event.kind;
+  lastPodiumCommentaryLineId = event.lineId;
+  lastPodiumCommentarySpeaker = event.speaker;
+  lastPodiumCommentaryFocusRacerId = event.focusRacerId;
+  showCaption(event.speaker, event.text);
+}
+
+function clearPodiumCommentary(): void {
+  podiumCommentaryEvents = [];
+  podiumCommentaryIndex = 0;
+  lastPodiumCommentaryKind = null;
+  lastPodiumCommentaryLineId = null;
+  lastPodiumCommentarySpeaker = null;
+  lastPodiumCommentaryFocusRacerId = null;
+}
+
 function showCampaignFinale(): void {
-  const champion = campaignLeader(campaignScores);
   gameState = 'finale';
   stagePodiumCeremony(campaignScores.slice(0, 3).map((score) => score.racerId), true);
   showScreen('podium');
@@ -801,8 +844,7 @@ function showCampaignFinale(): void {
     .join('');
   renderCampaignStandings();
   root.querySelector<HTMLButtonElement>('#nextRaceButton')!.textContent = 'Done';
-  showCaption('Mags Whitlow', fill(dialogue.finale[1][1]));
-  if (champion) showCaption('Arthur Bell', `${champion.name} is champion after ${tracks.length} races.`);
+  startPodiumCommentary(createFinaleCommentary(campaignScores, settings.playerName, tracks.length));
 }
 
 function forcePodiumForSmoke(finaleMode = false): void {
@@ -832,7 +874,7 @@ function forcePodiumForSmoke(finaleMode = false): void {
     stagePodiumCeremony(results.map((result) => result.racerId), false);
     showScreen('podium');
     renderPodium();
-    showCaption('Arthur Bell', fill(dialogue.podium[0][1]));
+    startPodiumCommentary(createRacePodiumCommentary(results, settings.playerName, campaignScores));
   }
 }
 
@@ -1134,6 +1176,11 @@ function exposeDebug(): void {
     replayDroppedSamples: lastReplay?.droppedSamples ?? 0,
     replaySampleRate: lastReplay?.sampleRate ?? 0,
     lightsOn,
+    caption: {
+      speaker: lastCaptionSpeaker,
+      text: lastCaptionText,
+      active: caption.classList.contains('active'),
+    },
     raceReadability: {
       trackMapActive: Boolean(trackMapLayout),
       trackMapDots: trackMapDotCount,
@@ -1175,6 +1222,14 @@ function exposeDebug(): void {
       stagedCarCount: podiumStagedCarCount,
       parkedCarCount: podiumParkedCarCount,
       stats: podiumStats,
+    },
+    podiumCommentary: {
+      eventCount: podiumCommentaryEvents.length,
+      nextIndex: podiumCommentaryIndex,
+      lastKind: lastPodiumCommentaryKind,
+      lastLineId: lastPodiumCommentaryLineId,
+      lastSpeaker: lastPodiumCommentarySpeaker,
+      lastFocusRacerId: lastPodiumCommentaryFocusRacerId,
     },
     driverRig: summarizeSceneDriverRigs(),
     audio: audio.metrics(),

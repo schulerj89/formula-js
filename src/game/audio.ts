@@ -43,7 +43,9 @@ export class RaceAudio {
   private missingAssets = new Set<string>();
   private disabledAssets = new Set<string>();
   private currentSongElement: HTMLAudioElement | null = null;
+  private currentVoiceElement: HTMLAudioElement | null = null;
   private activeGeneratedMusicId: string | null = null;
+  private activeGeneratedVoiceId: string | null = null;
   private generatedMusicEvents = 0;
   private generatedSpeechEvents = 0;
   private assetErrors = 0;
@@ -223,6 +225,7 @@ export class RaceAudio {
       fallbackSpeechEvents: number;
       assetErrors: number;
       activeGeneratedMusic: string | null;
+      activeGeneratedVoice: string | null;
     };
     race: RaceAudioFeedback & {
       tireScrubEvents: number;
@@ -248,6 +251,7 @@ export class RaceAudio {
         fallbackSpeechEvents: this.speechEvents,
         assetErrors: this.assetErrors,
         activeGeneratedMusic: this.activeGeneratedMusicId,
+        activeGeneratedVoice: this.activeGeneratedVoiceId,
       },
       race: {
         ...this.raceFeedback,
@@ -372,12 +376,25 @@ export class RaceAudio {
     if (!asset || this.disabledAssets.has(asset.id)) return false;
     const voice = this.loadedVoices.get(asset.id);
     if (!voice) return false;
+    if (this.currentVoiceElement && this.currentVoiceElement !== voice) {
+      this.currentVoiceElement.pause();
+      this.currentVoiceElement.currentTime = 0;
+    }
+    this.currentVoiceElement = voice;
+    this.activeGeneratedVoiceId = null;
     voice.currentTime = 0;
     void voice.play().then(() => {
-      this.generatedSpeechEvents += 1;
+      if (this.currentVoiceElement === voice) {
+        this.activeGeneratedVoiceId = asset.id;
+        this.generatedSpeechEvents += 1;
+      }
     }).catch(() => {
       this.disabledAssets.add(asset.id);
       this.assetErrors += 1;
+      if (this.currentVoiceElement === voice) {
+        this.currentVoiceElement = null;
+        this.activeGeneratedVoiceId = null;
+      }
       this.speakWithBrowser(speaker, text);
     });
     return true;

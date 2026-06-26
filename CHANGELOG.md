@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.0 - 2026-06-26
+
+- Added queued podium and campaign-finale commentary that names the winner, player result, top three, and championship standings.
+- Replaced immediate back-to-back finale captions with a sequenced post-race commentary queue.
+- Exposed caption and podium-commentary debug metrics for browser smoke tests.
+- Added generated-voice single-channel playback so future ElevenLabs podium/finale lines cannot overlap.
+
 ## 1.8.0 - 2026-06-26
 
 - Added active-race spotter calls for side-by-side threats and fast-closing traffic.

@@ -20,6 +20,7 @@ Mobile-first Three.js formula racing game.
 - Five-red-light pre-race start sequence with announcer setup.
 - Trackside atmosphere with Armco barriers, tire stacks, sponsor boards, pit wall, start grid marks, and a start gantry.
 - World-space podium ceremony with staged top-three cars, winner celebration camera, and higher-confetti campaign finale.
+- Queued podium/finale announcer summaries that call out the winner, player finish, top three, and campaign standings.
 - Bounded end-of-race replay playback from compact race-state samples with timed announcer/radio highlight calls.
 - Procedural menu, pre-race, podium, and finale music with no music during active racing.
 - Gear/rev-shaped formula engine audio with tire scrub, kerb/off-track thumps, and radio ducking metrics.
