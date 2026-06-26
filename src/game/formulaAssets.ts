@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import type { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { formulaAssetManifest } from '../data/assets';
 import { createDriverRig, createFormulaCar } from './models';
 
@@ -19,16 +19,19 @@ export interface FormulaAssetMetrics {
   failedAssetIds: AssetId[];
   fallbackReady: boolean;
   generatedReady: boolean;
+  loaderDeferred: boolean;
+  loaderLoaded: boolean;
   generatedCarsCreated: number;
   proceduralCarsCreated: number;
 }
 
 export class FormulaAssetManager {
-  private readonly loader = new GLTFLoader();
   private state: FormulaAssetMetrics['state'] = 'idle';
   private readonly loaded = new Map<AssetId, THREE.Object3D>();
   private readonly failed = new Set<AssetId>();
   private warmupPromise: Promise<void> | null = null;
+  private loaderPromise: Promise<GLTFLoader> | null = null;
+  private loaderLoaded = false;
   private generatedCarsCreated = 0;
   private proceduralCarsCreated = 0;
 
@@ -36,18 +39,25 @@ export class FormulaAssetManager {
     if (this.warmupPromise) return this.warmupPromise;
     this.state = 'loading';
     const entries = Object.entries(formulaAssetManifest.plannedGlb) as Array<[AssetId, string]>;
-    this.warmupPromise = Promise.all(
-      entries.map(async ([id, url]) => {
-        try {
-          const gltf = await this.loader.loadAsync(resolvePublicAssetUrl(url));
-          this.loaded.set(id, prepareAsset(gltf.scene));
-        } catch {
-          this.failed.add(id);
-        }
-      }),
-    ).then(() => {
-      this.state = this.loaded.size === entries.length ? 'ready' : this.loaded.size > 0 ? 'partial' : 'fallback';
-    });
+    this.warmupPromise = this.loadGltfLoader()
+      .then((loader) =>
+        Promise.all(
+          entries.map(async ([id, url]) => {
+            try {
+              const gltf = await loader.loadAsync(resolvePublicAssetUrl(url));
+              this.loaded.set(id, prepareAsset(gltf.scene));
+            } catch {
+              this.failed.add(id);
+            }
+          }),
+        ),
+      )
+      .catch(() => {
+        entries.forEach(([id]) => this.failed.add(id));
+      })
+      .then(() => {
+        this.state = this.loaded.size === entries.length ? 'ready' : this.loaded.size > 0 ? 'partial' : 'fallback';
+      });
     return this.warmupPromise;
   }
 
@@ -70,9 +80,19 @@ export class FormulaAssetManager {
       failedAssetIds: [...this.failed],
       fallbackReady: true,
       generatedReady: Boolean(this.currentKit()),
+      loaderDeferred: true,
+      loaderLoaded: this.loaderLoaded,
       generatedCarsCreated: this.generatedCarsCreated,
       proceduralCarsCreated: this.proceduralCarsCreated,
     };
+  }
+
+  private loadGltfLoader(): Promise<GLTFLoader> {
+    this.loaderPromise ??= import('three/addons/loaders/GLTFLoader.js').then(({ GLTFLoader }) => {
+      this.loaderLoaded = true;
+      return new GLTFLoader();
+    });
+    return this.loaderPromise;
   }
 
   private runtimeMode(): FormulaAssetMetrics['runtimeMode'] {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.25.0 - 2026-06-26
+
+- Deferred `GLTFLoader` behind the generated formula-kit warmup path so procedural gameplay starts without parsing optional GLB tooling.
+- Added loader metrics for deferred/loaded generated-asset state.
+- Added unit/browser coverage and a build-bundle verifier for the deferred loader contract.
+
 ## 1.24.0 - 2026-06-26
 
 - Routed generated radio-team voice MP3s through a narrow, compressed WebAudio radio filter chain.

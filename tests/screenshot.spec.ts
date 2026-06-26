@@ -180,6 +180,8 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.sceneDetails.totalInstances).toBeGreaterThan(isMobile ? 330 : 500);
   expect(metrics.assetKit.referenceImages.chassis).toContain('formula-chassis-reference.png');
   expect(metrics.assetStatus.generatedReady).toBe(true);
+  expect(metrics.assetStatus.loaderDeferred).toBe(true);
+  expect(metrics.assetStatus.loaderLoaded).toBe(true);
   expect(metrics.assetStatus.loadedAssetIds.sort()).toEqual(['chassis', 'driver', 'wheel']);
   expect(metrics.driverRig.activeCars).toBe(8);
   expect(metrics.driverRig.visibleCars).toBe(8);

@@ -1,11 +1,12 @@
 {
   "name": "formula-js",
-  "version": "1.24.0",
+  "version": "1.25.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
+    "bundle:check": "node scripts/verify-build-bundles.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run tests/race.test.ts",
     "screenshot": "playwright test tests/screenshot.spec.ts tests/asset-inspector.spec.ts tests/campaign-flow.spec.ts tests/performance-cycle.spec.ts tests/replay-flow.spec.ts tests/control-modes.spec.ts",

@@ -17,6 +17,7 @@ import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findRepl
 import { buildRaceScene, createPodiumCeremony, type SceneDetailLevel } from '../src/game/scene';
 import { TrackPath } from '../src/game/trackPath';
 import { animateDriverIdle, createFormulaCar, summarizeDriverRig } from '../src/game/models';
+import { createFormulaAssetManager } from '../src/game/formulaAssets';
 import { createFinaleCommentary, createRacePodiumCommentary } from '../src/game/podiumCommentary';
 import { createPreRaceCommentary } from '../src/game/preRaceCommentary';
 import type { GameSettings } from '../src/types';
@@ -427,6 +428,23 @@ describe('customization and asset pipeline data', () => {
     const car = createFormulaCar(0xe53935, 0xffd166);
     expect(car.userData.wheels).toHaveLength(4);
     expect(car.userData.wheels.every((wheel: { name: string }) => wheel.name === 'separate-wheel')).toBe(true);
+  });
+
+  it('keeps generated GLB loading deferred while procedural cars remain immediately available', () => {
+    const manager = createFormulaAssetManager();
+    const initial = manager.metrics();
+    expect(initial.loaderDeferred).toBe(true);
+    expect(initial.loaderLoaded).toBe(false);
+    expect(initial.fallbackReady).toBe(true);
+    expect(initial.generatedReady).toBe(false);
+
+    const car = manager.createCar(0xe53935, 0xffd166, true);
+    const metrics = manager.metrics();
+    expect(car.name).toBe('procedural-formula-car');
+    expect(metrics.runtimeMode).toBe('procedural');
+    expect(metrics.proceduralCarsCreated).toBe(1);
+    expect(metrics.generatedCarsCreated).toBe(0);
+    expect(metrics.loaderLoaded).toBe(false);
   });
 });
 
