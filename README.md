@@ -34,6 +34,7 @@ Keep ElevenLabs credentials outside git. The generator reads `ELEVENLABS_API_KEY
 - Procedural menu, pre-race, podium, and finale music with no music during active racing.
 - Gear/rev-shaped formula engine audio with tire scrub, kerb/off-track thumps, and radio ducking metrics.
 - Announcer/radio speech hooks plus optional ElevenLabs MP3 playback when generated assets exist.
+- Planned ElevenLabs pre-race voice assets cover Arthur's track-specific setup lines while player-name Mags lines stay dynamic.
 - Radio team lines use their own planned ElevenLabs voice ID and a compressed pit-wall fallback profile.
 - Procedural music and browser speech fallbacks when ElevenLabs assets are missing or blocked.
 - ElevenLabs manifest verification that keeps generated/planned audio files aligned with runtime asset IDs.

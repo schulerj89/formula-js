@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-26T08:49:31.129Z",
+  "generatedAt": "2026-06-26T10:46:17.436Z",
   "dryRun": true,
   "sources": {
     "tts": "https://api.elevenlabs.io/v1/text-to-speech/:voice_id",
@@ -12,6 +12,38 @@
       "voiceEnv": "ELEVENLABS_ARTHUR_VOICE_ID",
       "text": "{track} looks magnificent today: fast entries, dangerous exits, and very honest kerbs.",
       "file": "public/audio/elevenlabs/arthur-prerace.mp3",
+      "status": "planned"
+    },
+    {
+      "id": "arthur-prerace-silverpine-track",
+      "speaker": "Arthur Bell",
+      "voiceEnv": "ELEVENLABS_ARTHUR_VOICE_ID",
+      "text": "Silverpine Switchback asks for patience through the trees: quick entries, late exits, and no argument with the kerbs.",
+      "file": "public/audio/elevenlabs/arthur-prerace-silverpine-track.mp3",
+      "status": "planned"
+    },
+    {
+      "id": "arthur-prerace-marina-track",
+      "speaker": "Arthur Bell",
+      "voiceEnv": "ELEVENLABS_ARTHUR_VOICE_ID",
+      "text": "Marina Vista Circuit is narrow, polished, and unforgiving from the harbour tunnel to the sea wall stand.",
+      "file": "public/audio/elevenlabs/arthur-prerace-marina-track.mp3",
+      "status": "planned"
+    },
+    {
+      "id": "arthur-prerace-neon-track",
+      "speaker": "Arthur Bell",
+      "voiceEnv": "ELEVENLABS_ARTHUR_VOICE_ID",
+      "text": "Neon Borough GP is all braking references and city rhythm, with the metro flyover waiting to punish hesitation.",
+      "file": "public/audio/elevenlabs/arthur-prerace-neon-track.mp3",
+      "status": "planned"
+    },
+    {
+      "id": "arthur-prerace-valkyrie-track",
+      "speaker": "Arthur Bell",
+      "voiceEnv": "ELEVENLABS_ARTHUR_VOICE_ID",
+      "text": "Valkyrie Ridge is the longest and sternest test: ridge tunnel, summit tower, and commitment over every crest.",
+      "file": "public/audio/elevenlabs/arthur-prerace-valkyrie-track.mp3",
       "status": "planned"
     },
     {

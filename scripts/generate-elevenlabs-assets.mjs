@@ -27,6 +27,30 @@ const voiceLines = [
     text: '{track} looks magnificent today: fast entries, dangerous exits, and very honest kerbs.',
   },
   {
+    id: 'arthur-prerace-silverpine-track',
+    speaker: 'Arthur Bell',
+    voiceEnv: 'ELEVENLABS_ARTHUR_VOICE_ID',
+    text: 'Silverpine Switchback asks for patience through the trees: quick entries, late exits, and no argument with the kerbs.',
+  },
+  {
+    id: 'arthur-prerace-marina-track',
+    speaker: 'Arthur Bell',
+    voiceEnv: 'ELEVENLABS_ARTHUR_VOICE_ID',
+    text: 'Marina Vista Circuit is narrow, polished, and unforgiving from the harbour tunnel to the sea wall stand.',
+  },
+  {
+    id: 'arthur-prerace-neon-track',
+    speaker: 'Arthur Bell',
+    voiceEnv: 'ELEVENLABS_ARTHUR_VOICE_ID',
+    text: 'Neon Borough GP is all braking references and city rhythm, with the metro flyover waiting to punish hesitation.',
+  },
+  {
+    id: 'arthur-prerace-valkyrie-track',
+    speaker: 'Arthur Bell',
+    voiceEnv: 'ELEVENLABS_ARTHUR_VOICE_ID',
+    text: 'Valkyrie Ridge is the longest and sternest test: ridge tunnel, summit tower, and commitment over every crest.',
+  },
+  {
     id: 'mags-lights',
     speaker: 'Mags Whitlow',
     voiceEnv: 'ELEVENLABS_MAGS_VOICE_ID',

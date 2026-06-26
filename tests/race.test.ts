@@ -170,7 +170,14 @@ describe('audio data', () => {
 
   it('maps ElevenLabs runtime assets to non-race music cues and key voice lines', () => {
     expect(elevenLabsSongAssets.map((asset) => asset.cue).sort()).toEqual(['finale', 'menu', 'podium', 'prerace']);
-    expect(elevenLabsVoiceAssets).toHaveLength(5);
+    expect(elevenLabsVoiceAssets).toHaveLength(9);
+    expect(elevenLabsVoiceAssets.filter((asset) => asset.speaker === 'Arthur Bell').map((asset) => asset.id).sort()).toEqual([
+      'arthur-prerace',
+      'arthur-prerace-marina-track',
+      'arthur-prerace-neon-track',
+      'arthur-prerace-silverpine-track',
+      'arthur-prerace-valkyrie-track',
+    ]);
     expect(elevenLabsVoiceAssets.filter((asset) => asset.speaker === 'Radio').map((asset) => asset.id).sort()).toEqual([
       'radio-team-contact',
       'radio-team-damage',
@@ -179,6 +186,31 @@ describe('audio data', () => {
     expect(
       matchVoiceAsset('Arthur Bell', 'Silverpine Switchback looks magnificent today: fast entries, dangerous exits, and very honest kerbs.')?.id,
     ).toBe('arthur-prerace');
+    expect(
+      matchVoiceAsset(
+        'Arthur Bell',
+        'Silverpine Switchback asks for patience through the trees: quick entries, late exits, and no argument with the kerbs.',
+      )?.id,
+    ).toBe('arthur-prerace-silverpine-track');
+    expect(
+      matchVoiceAsset(
+        'Arthur Bell',
+        'Marina Vista Circuit is narrow, polished, and unforgiving from the harbour tunnel to the sea wall stand.',
+      )?.id,
+    ).toBe('arthur-prerace-marina-track');
+    expect(
+      matchVoiceAsset(
+        'Arthur Bell',
+        'Neon Borough GP is all braking references and city rhythm, with the metro flyover waiting to punish hesitation.',
+      )?.id,
+    ).toBe('arthur-prerace-neon-track');
+    expect(
+      matchVoiceAsset(
+        'Arthur Bell',
+        'Valkyrie Ridge is the longest and sternest test: ridge tunnel, summit tower, and commitment over every crest.',
+      )?.id,
+    ).toBe('arthur-prerace-valkyrie-track');
+    expect(matchVoiceAsset('Mags Whitlow', 'Under the neon, every mistake gets better lighting. No pressure, Juno Vale.')).toBeNull();
     expect(matchVoiceAsset('Mags Whitlow', 'Five red lights, then it is noise, nerves, and no excuses.')?.id).toBe('mags-lights');
     expect(matchVoiceAsset('Radio', 'Damage is climbing. Stay off the outside kerbs and bring it home.')?.id).toBe('radio-team-damage');
     expect(matchVoiceAsset('Radio', 'Contact confirmed. Check the front wing and give them space.')?.id).toBe('radio-team-contact');

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.23.0 - 2026-06-26
+
+- Added planned ElevenLabs assets for Arthur's track-specific pre-race setup lines.
+- Kept Mags' player-name pre-race lines on browser speech fallback so entered names remain accurate.
+- Updated the audio generator, manifest, and tests for the expanded pre-race voice plan.
+
 ## 1.22.0 - 2026-06-26
 
 - Added track-specific pre-race commentary banks for all four circuits.

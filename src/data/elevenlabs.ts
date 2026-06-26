@@ -1,6 +1,17 @@
 import type { MusicCueId } from './audio';
+import { dialogue } from './dialogue';
+import { tracks } from './tracks';
 
-export type VoiceAssetId = 'arthur-prerace' | 'mags-lights' | 'radio-team-damage' | 'radio-team-contact' | 'radio-team-tires';
+export type VoiceAssetId =
+  | 'arthur-prerace'
+  | 'arthur-prerace-silverpine-track'
+  | 'arthur-prerace-marina-track'
+  | 'arthur-prerace-neon-track'
+  | 'arthur-prerace-valkyrie-track'
+  | 'mags-lights'
+  | 'radio-team-damage'
+  | 'radio-team-contact'
+  | 'radio-team-tires';
 export type SongAssetId = 'menu-gridline-spark' | 'prerace-five-lights-rising' | 'podium-carbon-champagne' | 'finale-apex-parade';
 
 export interface ElevenLabsVoiceAsset {
@@ -23,6 +34,15 @@ export const elevenLabsVoiceAssets: ElevenLabsVoiceAsset[] = [
     src: '/audio/elevenlabs/arthur-prerace.mp3',
     match: /looks magnificent today: fast entries, dangerous exits, and very honest kerbs\.$/i,
   },
+  ...tracks.map((track) => {
+    const text = fillTrack(dialogue.preraceByTrack[track.id as keyof typeof dialogue.preraceByTrack][0][1], track.name);
+    return {
+      id: `arthur-prerace-${track.id}-track` as VoiceAssetId,
+      speaker: 'Arthur Bell' as const,
+      src: `/audio/elevenlabs/arthur-prerace-${track.id}-track.mp3`,
+      match: exactText(text),
+    };
+  }),
   {
     id: 'mags-lights',
     speaker: 'Mags Whitlow',
@@ -58,4 +78,16 @@ export const elevenLabsSongAssets: ElevenLabsSongAsset[] = [
 
 export function matchVoiceAsset(speaker: string, text: string): ElevenLabsVoiceAsset | null {
   return elevenLabsVoiceAssets.find((asset) => asset.speaker === speaker && asset.match.test(text)) ?? null;
+}
+
+function fillTrack(text: string, trackName: string): string {
+  return text.replaceAll('{track}', trackName);
+}
+
+function exactText(text: string): RegExp {
+  return new RegExp(`^${escapeRegExp(text)}$`, 'i');
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
