@@ -48,6 +48,8 @@ export class RaceAudio {
   private activeGeneratedVoiceId: string | null = null;
   private generatedMusicEvents = 0;
   private generatedSpeechEvents = 0;
+  private radioVoiceFilterChains = new WeakSet<HTMLAudioElement>();
+  private radioVoiceFilterChainCount = 0;
   private assetErrors = 0;
 
   constructor(private readonly settings: GameSettings) {}
@@ -223,6 +225,7 @@ export class RaceAudio {
       generatedSpeechEvents: number;
       fallbackMusicEvents: number;
       fallbackSpeechEvents: number;
+      radioVoiceFilterChains: number;
       assetErrors: number;
       activeGeneratedMusic: string | null;
       activeGeneratedVoice: string | null;
@@ -249,6 +252,7 @@ export class RaceAudio {
         generatedSpeechEvents: this.generatedSpeechEvents,
         fallbackMusicEvents: this.musicEvents,
         fallbackSpeechEvents: this.speechEvents,
+        radioVoiceFilterChains: this.radioVoiceFilterChainCount,
         assetErrors: this.assetErrors,
         activeGeneratedMusic: this.activeGeneratedMusicId,
         activeGeneratedVoice: this.activeGeneratedVoiceId,
@@ -326,6 +330,7 @@ export class RaceAudio {
         this.disabledAssets.add(assetId);
         return null;
       }
+      if (!loop && assetId.startsWith('radio-team-')) this.configureRadioVoiceElement(audio);
       return audio;
     } catch {
       this.assetErrors += 1;
@@ -376,6 +381,7 @@ export class RaceAudio {
     if (!asset || this.disabledAssets.has(asset.id)) return false;
     const voice = this.loadedVoices.get(asset.id);
     if (!voice) return false;
+    if (asset.speaker === 'Radio') this.configureRadioVoiceElement(voice);
     if (this.currentVoiceElement && this.currentVoiceElement !== voice) {
       this.currentVoiceElement.pause();
       this.currentVoiceElement.currentTime = 0;
@@ -398,6 +404,33 @@ export class RaceAudio {
       this.speakWithBrowser(speaker, text);
     });
     return true;
+  }
+
+  private configureRadioVoiceElement(voice: HTMLAudioElement): void {
+    if (!this.context || this.radioVoiceFilterChains.has(voice)) return;
+    try {
+      const source = this.context.createMediaElementSource(voice);
+      const highpass = this.context.createBiquadFilter();
+      const lowpass = this.context.createBiquadFilter();
+      const drive = this.context.createWaveShaper();
+      const gain = this.context.createGain();
+      highpass.type = 'highpass';
+      highpass.frequency.value = 420;
+      lowpass.type = 'lowpass';
+      lowpass.frequency.value = 2600;
+      drive.curve = createRadioCompressionCurve();
+      drive.oversample = '2x';
+      gain.gain.value = 0.95;
+      source.connect(highpass);
+      highpass.connect(lowpass);
+      lowpass.connect(drive);
+      drive.connect(gain);
+      gain.connect(this.context.destination);
+      this.radioVoiceFilterChains.add(voice);
+      this.radioVoiceFilterChainCount += 1;
+    } catch {
+      this.assetErrors += 1;
+    }
   }
 
   private playNoise(duration: number, volume: number, filterFrequency: number): void {
@@ -425,6 +458,15 @@ export class RaceAudio {
 }
 
 const ratio = (semitones: number): number => 2 ** (semitones / 12);
+
+function createRadioCompressionCurve(): Float32Array<ArrayBuffer> {
+  const curve = new Float32Array(new ArrayBuffer(256 * Float32Array.BYTES_PER_ELEMENT));
+  for (let i = 0; i < curve.length; i += 1) {
+    const x = (i / (curve.length - 1)) * 2 - 1;
+    curve[i] = Math.tanh(x * 2.4) * 0.82;
+  }
+  return curve;
+}
 
 function resolvePublicAssetUrl(url: string): string {
   if (!url.startsWith('/')) return url;

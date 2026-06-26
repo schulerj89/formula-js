@@ -48,12 +48,17 @@ function createFakeAudioContext(): AudioContext {
     connect: vi.fn(),
     start: vi.fn(),
     stop: vi.fn(),
+    curve: null,
+    oversample: 'none',
   });
   return {
     currentTime: 0,
     destination: {},
     createGain: createNode,
     createOscillator: createNode,
+    createBiquadFilter: createNode,
+    createWaveShaper: createNode,
+    createMediaElementSource: vi.fn(() => createNode()),
   } as unknown as AudioContext;
 }
 
@@ -355,6 +360,34 @@ describe('audio data', () => {
     expect(secondVoice.play).toHaveBeenCalledOnce();
     expect(metrics.assets.generatedSpeechEvents).toBe(1);
     expect(metrics.assets.activeGeneratedVoice).toBe('radio-team-damage');
+  });
+
+  it('routes generated radio-team voice through a compressed radio filter chain', async () => {
+    const audio = new RaceAudio({ ...settings, mute: false });
+    const context = createFakeAudioContext();
+    const radioVoice = {
+      currentTime: 0,
+      pause: vi.fn(),
+      play: vi.fn(() => Promise.resolve()),
+    } as unknown as HTMLAudioElement;
+    const internals = audio as unknown as {
+      context: AudioContext;
+      loadedVoices: Map<string, HTMLAudioElement>;
+    };
+    internals.context = context;
+    internals.loadedVoices.set('radio-team-contact', radioVoice);
+
+    audio.speak('Radio', 'Contact confirmed. Check the front wing and give them space.');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const mediaElementSource = context.createMediaElementSource as unknown as ReturnType<typeof vi.fn>;
+    const metrics = audio.metrics();
+    expect(mediaElementSource).toHaveBeenCalledWith(radioVoice);
+    expect(metrics.assets.radioVoiceFilterChains).toBe(1);
+    expect(metrics.assets.generatedSpeechEvents).toBe(1);
+    expect(metrics.assets.activeGeneratedVoice).toBe('radio-team-contact');
+    expect(metrics.race.radioDucks).toBe(1);
   });
 });
 

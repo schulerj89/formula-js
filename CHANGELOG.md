@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.24.0 - 2026-06-26
+
+- Routed generated radio-team voice MP3s through a narrow, compressed WebAudio radio filter chain.
+- Added debug metrics and unit coverage proving generated radio lines keep radio processing and race-audio ducking.
+- Captured the version-slice progress-list rule in `AGENTS.md`.
+
 ## 1.23.0 - 2026-06-26
 
 - Added planned ElevenLabs assets for Arthur's track-specific pre-race setup lines.
