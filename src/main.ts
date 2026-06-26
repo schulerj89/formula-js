@@ -589,7 +589,7 @@ function startRace(): void {
   control.throttle = false;
   control.steer = 0;
   clearCaptionQueue(false);
-  showCaption('Mags Whitlow', fill(dialogue.lights[1][1]), 4.4);
+  showCaption('Mags Whitlow', fill(dialogue.lights[1][1]), 4.4, 'mags.lights.five-red');
 }
 
 function updateStartLights(): void {
@@ -950,7 +950,7 @@ function updateRaceAnnouncements(snapshot: RaceSnapshot, force = false): void {
     lastRadio = event.radioKey;
     if (!deliveredRadioKeys.includes(event.radioKey)) deliveredRadioKeys.push(event.radioKey);
   }
-  showCaption(event.speaker, event.text);
+  showCaption(event.speaker, event.text, 5.5, event.lineId);
 }
 
 function rotateCaption(): void {
@@ -982,7 +982,7 @@ function clearCaptionQueue(resetMetrics: boolean): void {
   }
 }
 
-function showCaption(name: string, text: string, duration = 5.5): void {
+function showCaption(name: string, text: string, duration = 5.5, lineId?: string | null): void {
   caption.textContent = '';
   const speaker = document.createElement('strong');
   speaker.textContent = name;
@@ -992,7 +992,7 @@ function showCaption(name: string, text: string, duration = 5.5): void {
   lastCaptionText = text;
   if (!captionQueueSpeakers.includes(name)) captionQueueSpeakers.push(name);
   captionTimer = duration;
-  audio.speak(name, text);
+  audio.speak(name, text, lineId);
 }
 
 function renderPodium(): void {
@@ -1040,7 +1040,7 @@ function showNextPodiumCommentary(): void {
   lastPodiumCommentaryLineId = event.lineId;
   lastPodiumCommentarySpeaker = event.speaker;
   lastPodiumCommentaryFocusRacerId = event.focusRacerId;
-  showCaption(event.speaker, event.text);
+  showCaption(event.speaker, event.text, 5.5, event.lineId);
 }
 
 function clearPodiumCommentary(): void {
@@ -1346,7 +1346,7 @@ function updateReplayEvents(replay: RaceReplay): void {
   replayNextCaptionAt = wrapped + 4.4;
   replayFocusRacerId = event.focusRacerId ?? replayFocusRacerId;
   lastReplayEvent = event;
-  showCaption(event.speaker, event.text);
+  showCaption(event.speaker, event.text, 5.5, event.lineId);
 }
 
 function currentControl(): RaceControl {

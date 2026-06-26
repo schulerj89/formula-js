@@ -183,7 +183,7 @@ export class RaceAudio {
     this.musicEvents += 1;
   }
 
-  speak(speaker: string, text: string): void {
+  speak(speaker: string, text: string, lineId?: string | null): void {
     this.lastSpeaker = speaker;
     if (this.settings.mute) return;
     this.radioClick(speaker === 'Radio');
@@ -192,7 +192,7 @@ export class RaceAudio {
       this.engineGain?.gain.setTargetAtTime(Math.max(0.012, this.raceFeedback.engineGain * 0.45), this.context?.currentTime ?? 0, 0.025);
       this.engineHarmonicGain?.gain.setTargetAtTime(0.004, this.context?.currentTime ?? 0, 0.025);
     }
-    if (this.playGeneratedVoice(speaker, text)) return;
+    if (this.playGeneratedVoice(speaker, text, lineId)) return;
     this.speakWithBrowser(speaker, text);
   }
 
@@ -376,8 +376,8 @@ export class RaceAudio {
     return true;
   }
 
-  private playGeneratedVoice(speaker: string, text: string): boolean {
-    const asset = matchVoiceAsset(speaker, text);
+  private playGeneratedVoice(speaker: string, text: string, lineId?: string | null): boolean {
+    const asset = matchVoiceAsset(speaker, text, lineId);
     if (!asset || this.disabledAssets.has(asset.id)) return false;
     const voice = this.loadedVoices.get(asset.id);
     if (!voice) return false;

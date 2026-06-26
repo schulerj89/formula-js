@@ -240,6 +240,13 @@ describe('audio data', () => {
     expect(matchVoiceAsset('Mags Whitlow', 'Under the neon, every mistake gets better lighting. No pressure, Juno Vale.')).toBeNull();
     expect(matchVoiceAsset('Mags Whitlow', 'Five red lights, then it is noise, nerves, and no excuses.')?.id).toBe('mags-lights');
     expect(matchVoiceAsset('Radio', 'Damage is climbing. Stay off the outside kerbs and bring it home.')?.id).toBe('radio-team-damage');
+    expect(matchVoiceAsset('Radio', 'Damage call text can change while line identity stays stable.', 'radio.damage.climbing')?.id).toBe(
+      'radio-team-damage',
+    );
+    expect(matchVoiceAsset('Arthur Bell', 'Damage call text can change while line identity stays stable.', 'radio.damage.climbing')).toBeNull();
+    expect(matchVoiceAsset('Radio', 'Damage is climbing. Stay off the outside kerbs and bring it home.', 'unknown.line')?.id).toBe(
+      'radio-team-damage',
+    );
     expect(matchVoiceAsset('Radio', 'Contact confirmed. Check the front wing and give them space.')?.id).toBe('radio-team-contact');
     expect(matchVoiceAsset('Radio', 'Tyres are fading. Brake earlier and keep the steering smooth.')?.id).toBe('radio-team-tires');
   });
@@ -380,6 +387,27 @@ describe('audio data', () => {
     expect(firstVoice.pause).toHaveBeenCalledOnce();
     expect(firstVoice.currentTime).toBe(0);
     expect(secondVoice.play).toHaveBeenCalledOnce();
+    expect(metrics.assets.generatedSpeechEvents).toBe(1);
+    expect(metrics.assets.activeGeneratedVoice).toBe('radio-team-damage');
+  });
+
+  it('plays generated voice by stable line id before falling back to text matching', async () => {
+    const audio = new RaceAudio({ ...settings, mute: false });
+    const damageVoice = {
+      currentTime: 0,
+      play: vi.fn(() => Promise.resolve()),
+    } as unknown as HTMLAudioElement;
+    const internals = audio as unknown as {
+      loadedVoices: Map<string, HTMLAudioElement>;
+    };
+    internals.loadedVoices.set('radio-team-damage', damageVoice);
+
+    audio.speak('Radio', 'Replay damage copy can be edited without losing the planned voice.', 'radio.damage.climbing');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const metrics = audio.metrics();
+    expect(damageVoice.play).toHaveBeenCalledOnce();
     expect(metrics.assets.generatedSpeechEvents).toBe(1);
     expect(metrics.assets.activeGeneratedVoice).toBe('radio-team-damage');
   });

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.29.3 - 2026-06-26
+
+- Added optional line-ID matching for generated voice assets while preserving exact speaker/text fallback matching.
+- Threaded stable line IDs through race, replay, podium, and lights caption playback so generated voices can survive safe caption copy edits.
+
 ## 1.29.2 - 2026-06-26
 
 - Added stable `lineId` and `radioKey` metadata to replay highlight events so replay commentary can be matched to planned/generated voice lines.
