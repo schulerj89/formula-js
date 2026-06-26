@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test.setTimeout(95_000);
 
-test('plays a completed race replay with highlight commentary', async ({ page }) => {
+test('plays a completed race replay with highlight commentary', async ({ page }, testInfo) => {
   const viewport = page.viewportSize();
   test.skip(Boolean(viewport && viewport.width <= 640), 'Replay flow smoke runs once on desktop to keep browser time bounded.');
 
@@ -15,18 +15,24 @@ test('plays a completed race replay with highlight commentary', async ({ page })
   await page.waitForTimeout(3500);
   await page.keyboard.up('Space');
   await page.waitForFunction(() => ((window as any).__GRIDLINE_APEX__?.metrics?.liveReplayFrames ?? 0) > 20);
+  await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.debug?.forceAnnouncementConflict?.());
+  await page.waitForFunction(() => ((window as any).__GRIDLINE_APEX__?.metrics?.liveReplayIncidents ?? 0) > 0);
   await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.debug?.forceRaceFinish?.());
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'podium');
 
   const podiumMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
   expect(podiumMetrics.replayFrames).toBeGreaterThan(20);
+  expect(podiumMetrics.replayIncidents).toBeGreaterThanOrEqual(1);
   expect(podiumMetrics.replayEvents).toBeGreaterThanOrEqual(3);
   expect(podiumMetrics.replayBytes).toBeLessThan(4 * 1024 * 1024);
 
   await page.getByRole('button', { name: 'Replay' }).click();
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'replay');
   await page.waitForFunction(() => ((window as any).__GRIDLINE_APEX__?.metrics?.replayPlayback?.eventIndex ?? 0) > 0);
-  await page.waitForTimeout(1800);
+  await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.replayPlayback?.lastEvent?.sourceKind === 'radio-team-contact', null, {
+    timeout: 9000,
+  });
+  await page.screenshot({ path: testInfo.outputPath('incident-replay.png'), fullPage: true });
 
   const replayMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
   expect(replayMetrics.replayPlayback.active).toBe(true);
@@ -37,7 +43,9 @@ test('plays a completed race replay with highlight commentary', async ({ page })
   expect(replayMetrics.replayPlayback.focusRacerId).toBeTruthy();
   expect(replayMetrics.replayPlayback.lastEvent).toBeTruthy();
   expect(replayMetrics.replayPlayback.lastEvent.lineId).toMatch(/^(arthur|mags|radio)\.replay\./);
-  expect(replayMetrics.replayPlayback.lastEvent.radioKey === null || ['damage', 'tires'].includes(replayMetrics.replayPlayback.lastEvent.radioKey)).toBe(true);
+  expect(replayMetrics.replayPlayback.lastEvent.sourceKind).toBe('radio-team-contact');
+  expect(replayMetrics.replayPlayback.lastEvent.sourceTime).toBeGreaterThan(0);
+  expect(replayMetrics.replayPlayback.lastEvent.radioKey === null || ['contact', 'damage', 'tires'].includes(replayMetrics.replayPlayback.lastEvent.radioKey)).toBe(true);
   expect(replayMetrics.replayPlayback.lastEvent.speaker).toBe(replayMetrics.caption.speaker);
   expect(replayMetrics.replayPlayback.lastEvent.focusRacerId ?? replayMetrics.replayPlayback.focusRacerId).toBe(replayMetrics.replayPlayback.focusRacerId);
   expect(replayMetrics.caption.active).toBe(true);

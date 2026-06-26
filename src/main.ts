@@ -956,6 +956,14 @@ function updateRaceAnnouncements(snapshot: RaceSnapshot, force = false): void {
     lastRadio = event.radioKey;
     if (!deliveredRadioKeys.includes(event.radioKey)) deliveredRadioKeys.push(event.radioKey);
   }
+  replayRecorder?.markIncident({
+    sourceKind: event.kind,
+    lineId: event.lineId,
+    speaker: event.speaker,
+    text: event.text,
+    focusRacerId: event.focusRacerId,
+    radioKey: event.radioKey,
+  });
   showCaption(event.speaker, event.text, 5.5, event.lineId);
 }
 
@@ -1355,7 +1363,7 @@ function updateReplayEvents(replay: RaceReplay): void {
   const event = replay.events[replayEventIndex];
   if (!event || event.time > wrapped || wrapped < replayNextCaptionAt) return;
   replayEventIndex += 1;
-  replayNextCaptionAt = wrapped + 4.4;
+  replayNextCaptionAt = wrapped + Math.min(4.4, Math.max(1.1, replay.duration / Math.max(2, replay.events.length)));
   replayFocusRacerId = event.focusRacerId ?? replayFocusRacerId;
   lastReplayEvent = event;
   showCaption(event.speaker, event.text, 5.5, event.lineId);
@@ -1560,6 +1568,8 @@ function buildDebugMetrics() {
     previewTrack: menuPreviewTrack.id,
     replayFrames: lastReplay?.frames.length ?? 0,
     liveReplayFrames: replayRecorder?.frameCount() ?? 0,
+    replayIncidents: lastReplay?.incidentCount ?? 0,
+    liveReplayIncidents: replayRecorder?.incidentCount() ?? 0,
     replayEvents: lastReplay?.events.length ?? 0,
     replayEventIndex,
     replayFocusRacerId,
@@ -1582,6 +1592,8 @@ function buildDebugMetrics() {
             speaker: lastReplayEvent.speaker,
             focusRacerId: lastReplayEvent.focusRacerId ?? null,
             radioKey: lastReplayEvent.radioKey,
+            sourceKind: lastReplayEvent.sourceKind,
+            sourceTime: lastReplayEvent.sourceTime,
           }
         : null,
     },

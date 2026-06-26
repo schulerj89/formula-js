@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.32.0 - 2026-06-26
+
+- Anchored replay highlight events to active-race incidents such as contact, position changes, and spotter calls.
+- Added replay incident counts plus `sourceKind` and `sourceTime` playback metrics so replay captions can prove which race moment they came from.
+- Extended replay unit and browser coverage with a forced contact incident and captured incident replay artifact.
+
 ## 1.31.1 - 2026-06-26
 
 - Added an `audio:doctor` command that checks ElevenLabs API-key and voice-ID readiness without printing secrets.

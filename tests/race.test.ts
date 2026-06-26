@@ -994,7 +994,54 @@ describe('replay recording', () => {
     expect(events.find((event) => event.kind === 'damage')?.radioKey).toBe('damage');
     expect(events.find((event) => event.kind === 'tires')?.speaker).toBe('Radio');
     expect(events.find((event) => event.kind === 'tires')?.radioKey).toBe('tires');
+    expect(events.find((event) => event.kind === 'move')?.sourceKind).toBe('timed');
     expect(events.find((event) => event.kind === 'finish')?.focusRacerId).toBe('rival');
+  });
+
+  it('anchors replay highlight events to recorded race incidents', () => {
+    const events = createReplayEvents(
+      'Test Track',
+      'Test Driver',
+      18,
+      [{ racerId: 'player', name: 'Test Driver', totalTime: 18, bestLap: 17, damage: 0.92, tires: 0.86 }],
+      [
+        {
+          time: 4.25,
+          sourceKind: 'position-gained',
+          lineId: 'mags.position-gained.clean-pass',
+          speaker: 'Mags Whitlow',
+          text: 'Test Driver gets past LV.',
+          focusRacerId: 'luca',
+          radioKey: null,
+        },
+        {
+          time: 6.5,
+          sourceKind: 'radio-team-contact',
+          lineId: 'radio.contact.damage-check',
+          speaker: 'Radio',
+          text: 'Contact confirmed.',
+          focusRacerId: 'maya',
+          radioKey: 'contact',
+        },
+      ],
+    );
+    const contact = events.find((event) => event.kind === 'contact');
+    const pass = events.find((event) => event.sourceKind === 'position-gained');
+    expect(events.map((event) => event.sourceKind)).toContain('radio-team-contact');
+    expect(contact).toMatchObject({
+      lineId: 'radio.replay.contact-check',
+      speaker: 'Radio',
+      focusRacerId: 'maya',
+      radioKey: 'contact',
+      sourceTime: 6.5,
+    });
+    expect(pass).toMatchObject({
+      lineId: 'mags.replay.incident-pass',
+      focusRacerId: 'luca',
+      sourceTime: 4.25,
+    });
+    expect(events.some((event) => event.lineId === 'mags.replay.middle-sector-commitment')).toBe(false);
+    expect(events.every((event, index) => index === 0 || event.time >= events[index - 1].time)).toBe(true);
   });
 
   it('keeps replay event times inside the retained frame window when samples drop', () => {
@@ -1005,12 +1052,24 @@ describe('replay recording', () => {
     for (let i = 0; i < 80; i += 1) {
       snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: 0.15 });
       recorder.record(1 / 30, snapshot);
+      if (i === 72) {
+        recorder.markIncident({
+          sourceKind: 'spotter-side',
+          lineId: 'radio.spotter-side.left',
+          speaker: 'Radio',
+          text: 'Maya alongside left. Hold your line.',
+          focusRacerId: 'maya-cross',
+          radioKey: null,
+        });
+      }
     }
     const replay = recorder.finalize([]);
     expect(replay.droppedSamples).toBeGreaterThan(0);
     expect(replay.frames[0].time).toBe(0);
     expect(replay.duration).toBeLessThan(1);
     expect(replay.events.every((event) => event.time <= replay.duration)).toBe(true);
+    expect(replay.incidentCount).toBe(1);
+    expect(replay.events.find((event) => event.sourceKind === 'spotter-side')?.focusRacerId).toBe('maya-cross');
     expect(findReplayFrame(replay, replay.duration + 0.05)?.racers).toHaveLength(8);
   });
 
