@@ -17,6 +17,22 @@ export const tracks: TrackDefinition[] = [
       { label: 'Stone bridge', at: 0.43, kind: 'bridge' },
       { label: 'Broadcast tower', at: 0.76, kind: 'tower' },
     ],
+    readability: {
+      brakeZones: [
+        { at: 0.07, side: 1 },
+        { at: 0.28, side: 1 },
+        { at: 0.51, side: 1 },
+        { at: 0.72, side: 1 },
+      ],
+      apexes: [
+        { at: 0.19, side: 1, kerb: [0.172, 0.208], kind: 'apex' },
+        { at: 0.27, side: -1, kerb: [0.252, 0.288], kind: 'apex' },
+        { at: 0.36, side: 1, kerb: [0.342, 0.378], kind: 'exit' },
+        { at: 0.64, side: 1, kerb: [0.622, 0.658], kind: 'apex' },
+        { at: 0.73, side: -1, kerb: [0.712, 0.748], kind: 'apex' },
+        { at: 0.81, side: 1, kerb: [0.792, 0.828], kind: 'exit' },
+      ],
+    },
   },
   {
     id: 'marina',
@@ -34,6 +50,22 @@ export const tracks: TrackDefinition[] = [
       { label: 'Yacht bridge', at: 0.57, kind: 'bridge' },
       { label: 'Sea wall stand', at: 0.88, kind: 'grandstand' },
     ],
+    readability: {
+      brakeZones: [
+        { at: 0.1, side: 1 },
+        { at: 0.35, side: 1 },
+        { at: 0.59, side: 1 },
+        { at: 0.82, side: 1 },
+      ],
+      apexes: [
+        { at: 0.16, side: 1, kerb: [0.142, 0.178], kind: 'apex' },
+        { at: 0.23, side: -1, kerb: [0.212, 0.248], kind: 'exit' },
+        { at: 0.3, side: 1, kerb: [0.282, 0.318], kind: 'apex' },
+        { at: 0.7, side: 1, kerb: [0.682, 0.718], kind: 'apex' },
+        { at: 0.77, side: -1, kerb: [0.752, 0.788], kind: 'apex' },
+        { at: 0.84, side: 1, kerb: [0.822, 0.858], kind: 'exit' },
+      ],
+    },
   },
   {
     id: 'neon',
@@ -51,6 +83,23 @@ export const tracks: TrackDefinition[] = [
       { label: 'Neon tower', at: 0.48, kind: 'tower' },
       { label: 'Downtown stand', at: 0.71, kind: 'grandstand' },
     ],
+    readability: {
+      brakeZones: [
+        { at: 0.05, side: 1 },
+        { at: 0.25, side: 1 },
+        { at: 0.49, side: 1 },
+        { at: 0.69, side: 1 },
+        { at: 0.87, side: 1 },
+      ],
+      apexes: [
+        { at: 0.16, side: 1, kerb: [0.142, 0.178], kind: 'apex' },
+        { at: 0.23, side: -1, kerb: [0.212, 0.248], kind: 'exit' },
+        { at: 0.46, side: -1, kerb: [0.442, 0.478], kind: 'apex' },
+        { at: 0.7, side: 1, kerb: [0.682, 0.718], kind: 'apex' },
+        { at: 0.77, side: -1, kerb: [0.752, 0.788], kind: 'apex' },
+        { at: 0.84, side: 1, kerb: [0.822, 0.858], kind: 'exit' },
+      ],
+    },
   },
   {
     id: 'valkyrie',
@@ -68,6 +117,23 @@ export const tracks: TrackDefinition[] = [
       { label: 'Ski jump bridge', at: 0.62, kind: 'bridge' },
       { label: 'Summit tower', at: 0.84, kind: 'tower' },
     ],
+    readability: {
+      brakeZones: [
+        { at: 0.09, side: 1 },
+        { at: 0.29, side: 1 },
+        { at: 0.46, side: 1 },
+        { at: 0.63, side: 1 },
+        { at: 0.83, side: 1 },
+      ],
+      apexes: [
+        { at: 0.16, side: 1, kerb: [0.142, 0.178], kind: 'apex' },
+        { at: 0.23, side: -1, kerb: [0.212, 0.248], kind: 'exit' },
+        { at: 0.3, side: 1, kerb: [0.282, 0.318], kind: 'apex' },
+        { at: 0.62, side: 1, kerb: [0.602, 0.638], kind: 'apex' },
+        { at: 0.69, side: -1, kerb: [0.672, 0.708], kind: 'apex' },
+        { at: 0.77, side: 1, kerb: [0.752, 0.788], kind: 'exit' },
+      ],
+    },
   },
 ];
 

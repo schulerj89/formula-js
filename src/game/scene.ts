@@ -10,9 +10,18 @@ export interface SceneBuild {
 }
 
 export interface TracksideDetailStats {
+  visualKerbSegments: number;
+  kerbInstances: number;
   barrierPanels: number;
   sponsorBoards: number;
   tireStacks: number;
+  brakeBoardZones: number;
+  brakeBoardPanels: number;
+  brakeBoards: number;
+  brakeBoardPosts: number;
+  apexPosts: number;
+  readabilityMarkerInstances: number;
+  readabilityInstancedBatches: number;
   pitWallSegments: number;
   startGridMarks: number;
   gantryLights: number;
@@ -58,7 +67,8 @@ export function buildRaceScene(
   const path = new TrackPath(track);
   scene.add(createGround(track));
   scene.add(createTrackRibbon(path, detailLevel));
-  scene.add(createKerbs(path, track, detailLevel));
+  const kerbs = createKerbs(path, track, detailLevel);
+  scene.add(kerbs.group);
   scene.add(createScenery(path, track, detailLevel));
   scene.add(createLandmarks(path, track));
   const tracksideDetails = createTracksideDetails(path, track, detailLevel);
@@ -75,7 +85,7 @@ export function buildRaceScene(
     cars.set(racer.id, car);
   });
 
-  return { path, cars, detailStats: tracksideDetails.stats };
+  return { path, cars, detailStats: { ...tracksideDetails.stats, ...kerbs.stats } };
 }
 
 function defaultCarFactory(racer: RacerDefinition): THREE.Group {
@@ -142,7 +152,11 @@ function createTrackRibbon(path: TrackPath, detailLevel: SceneDetailLevel): THRE
   return new THREE.Mesh(geometry, material);
 }
 
-function createKerbs(path: TrackPath, track: TrackDefinition, detailLevel: SceneDetailLevel): THREE.Group {
+function createKerbs(
+  path: TrackPath,
+  track: TrackDefinition,
+  detailLevel: SceneDetailLevel,
+): { group: THREE.Group; stats: { visualKerbSegments: number; kerbInstances: number } } {
   const group = new THREE.Group();
   const red = new THREE.MeshLambertMaterial({ color: 0xd62828 });
   const white = new THREE.MeshLambertMaterial({ color: 0xf8f9fa });
@@ -153,10 +167,13 @@ function createKerbs(path: TrackPath, track: TrackDefinition, detailLevel: Scene
   const scale = new THREE.Vector3(1, 1, 1);
 
   const step = detailLevel === 'full' ? 0.006 : detailLevel === 'balanced' ? 0.008 : 0.011;
-  for (const [start, end] of track.kerbZones) {
+  const visualKerbs = track.readability?.apexes.length
+    ? track.readability.apexes.map((apex) => ({ start: apex.kerb[0], end: apex.kerb[1], sides: [apex.side] }))
+    : track.kerbZones.map(([start, end]) => ({ start, end, sides: [-1, 1] }));
+  for (const { start, end, sides } of visualKerbs) {
     for (let p = start; p < end; p += step) {
       const pose = path.poseAt(p);
-      for (const side of [-1, 1]) {
+      for (const side of sides) {
         const matrix = new THREE.Matrix4();
         rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw);
         const position = pose.position.clone().addScaledVector(pose.normal, side * (roadWidth / 2 + 0.34));
@@ -177,7 +194,7 @@ function createKerbs(path: TrackPath, track: TrackDefinition, detailLevel: Scene
   redKerbs.instanceMatrix.needsUpdate = true;
   whiteKerbs.instanceMatrix.needsUpdate = true;
   group.add(redKerbs, whiteKerbs);
-  return group;
+  return { group, stats: { visualKerbSegments: visualKerbs.length, kerbInstances: redMatrices.length + whiteMatrices.length } };
 }
 
 function createScenery(path: TrackPath, track: TrackDefinition, detailLevel: SceneDetailLevel): THREE.Group {
@@ -316,6 +333,8 @@ function createTracksideDetails(path: TrackPath, track: TrackDefinition, detailL
   tireStacks.count = tireStackMatrices.length;
   tireStacks.instanceMatrix.needsUpdate = true;
 
+  const brakingMarkers = createBrakingMarkers(path, track);
+
   const pitWallSegments = detailLevel === 'full' ? 26 : detailLevel === 'balanced' ? 18 : 12;
   const pitWallGeo = new THREE.BoxGeometry(2.4, 0.7, 0.34, 1, 1, 1);
   const pitWallMat = new THREE.MeshLambertMaterial({ color: 0xf3f5f8 });
@@ -346,20 +365,111 @@ function createTracksideDetails(path: TrackPath, track: TrackDefinition, detailL
   }
   gridMarks.instanceMatrix.needsUpdate = true;
 
-  group.add(barriers, boards, tireStacks, pitWall, gridMarks, createStartGantry(path, track));
+  group.add(barriers, boards, tireStacks, brakingMarkers.group, pitWall, gridMarks, createStartGantry(path, track));
   return {
     group,
     stats: {
+      visualKerbSegments: 0,
+      kerbInstances: 0,
       barrierPanels,
       sponsorBoards,
       tireStacks: tireStackMatrices.length,
+      brakeBoardZones: brakingMarkers.brakeBoardZones,
+      brakeBoardPanels: brakingMarkers.brakeBoards,
+      brakeBoards: brakingMarkers.brakeBoards,
+      brakeBoardPosts: brakingMarkers.brakeBoardPosts,
+      apexPosts: brakingMarkers.apexPosts,
+      readabilityMarkerInstances: brakingMarkers.brakeBoards + brakingMarkers.brakeBoardPosts + brakingMarkers.apexPosts,
+      readabilityInstancedBatches: 3,
       pitWallSegments,
       startGridMarks,
       gantryLights: 5,
-      instancedBatches: 5,
-      totalInstances: barrierPanels + sponsorBoards + tireStackMatrices.length + pitWallSegments + startGridMarks,
+      instancedBatches: 8,
+      totalInstances:
+        barrierPanels +
+        sponsorBoards +
+        tireStackMatrices.length +
+        brakingMarkers.brakeBoards +
+        brakingMarkers.brakeBoardPosts +
+        brakingMarkers.apexPosts +
+        pitWallSegments +
+        startGridMarks,
     },
   };
+}
+
+function createBrakingMarkers(
+  path: TrackPath,
+  track: TrackDefinition,
+): { group: THREE.Group; brakeBoardZones: number; brakeBoards: number; brakeBoardPosts: number; apexPosts: number } {
+  const group = new THREE.Group();
+  group.name = 'braking-markers';
+  const boardGeo = new THREE.BoxGeometry(1.35, 1.15, 0.18, 1, 1, 1);
+  const postGeo = new THREE.BoxGeometry(0.18, 1.45, 0.18, 1, 1, 1);
+  const apexGeo = new THREE.CylinderGeometry(0.28, 0.42, 1.35, 12, 1);
+  const whiteMat = new THREE.MeshLambertMaterial({ color: 0xf8f9fa });
+  const redMat = new THREE.MeshLambertMaterial({ color: 0xd62828 });
+  const boardMatrices: THREE.Matrix4[] = [];
+  const postMatrices: THREE.Matrix4[] = [];
+  const apexMatrices: THREE.Matrix4[] = [];
+  const matrix = new THREE.Matrix4();
+  const rotation = new THREE.Quaternion();
+  const boardScale = new THREE.Vector3(1, 1, 1);
+  const boardDistances = [150, 100, 50];
+  const brakeZones = track.readability?.brakeZones ?? track.kerbZones.map(([at]) => ({ at, side: 1 as const }));
+  const apexMarkers = track.readability?.apexes ?? track.kerbZones.map(([start, end]) => ({ at: start + (end - start) * 0.5, side: 1 as const }));
+
+  for (const brakeZone of brakeZones) {
+    const markerSide = brakeZone.side;
+    for (const meters of boardDistances) {
+      const progress = wrapProgress(brakeZone.at - meters / (track.lengthKm * 1000));
+      const pose = path.poseAt(progress, markerSide * (roadWidth / 2 + 5.35));
+      const position = pose.position.clone();
+      position.y = 1.28;
+      rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw - Math.PI / 2);
+      matrix.compose(position, rotation, boardScale);
+      boardMatrices.push(matrix.clone());
+      const postPosition = pose.position.clone();
+      postPosition.y = 0.72;
+      postPosition.addScaledVector(pose.normal, markerSide * 0.55);
+      matrix.compose(postPosition, rotation, boardScale);
+      postMatrices.push(matrix.clone());
+    }
+  }
+
+  for (const apex of apexMarkers) {
+    const apexPose = path.poseAt(apex.at);
+    const apexPosition = apexPose.position.clone().addScaledVector(apexPose.normal, apex.side * (roadWidth / 2 + 1.18));
+    apexPosition.y = 0.7;
+    rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), apexPose.yaw);
+    matrix.compose(apexPosition, rotation, boardScale);
+    apexMatrices.push(matrix.clone());
+  }
+
+  const brakeBoards = new THREE.InstancedMesh(boardGeo, whiteMat, Math.max(1, boardMatrices.length));
+  const brakePosts = new THREE.InstancedMesh(postGeo, redMat, Math.max(1, postMatrices.length));
+  const apexPosts = new THREE.InstancedMesh(apexGeo, redMat, Math.max(1, apexMatrices.length));
+  boardMatrices.forEach((item, index) => brakeBoards.setMatrixAt(index, item));
+  postMatrices.forEach((item, index) => brakePosts.setMatrixAt(index, item));
+  apexMatrices.forEach((item, index) => apexPosts.setMatrixAt(index, item));
+  brakeBoards.count = boardMatrices.length;
+  brakePosts.count = postMatrices.length;
+  apexPosts.count = apexMatrices.length;
+  brakeBoards.instanceMatrix.needsUpdate = true;
+  brakePosts.instanceMatrix.needsUpdate = true;
+  apexPosts.instanceMatrix.needsUpdate = true;
+  group.add(brakeBoards, brakePosts, apexPosts);
+  return {
+    group,
+    brakeBoardZones: brakeZones.length,
+    brakeBoards: boardMatrices.length,
+    brakeBoardPosts: postMatrices.length,
+    apexPosts: apexMatrices.length,
+  };
+}
+
+function wrapProgress(progress: number): number {
+  return ((progress % 1) + 1) % 1;
 }
 
 function createStartGantry(path: TrackPath, track: TrackDefinition): THREE.Group {

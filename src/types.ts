@@ -20,6 +20,10 @@ export interface TrackDefinition {
   points: Array<[number, number]>;
   kerbZones: Array<[number, number]>;
   landmarks: Array<{ label: string; at: number; kind: 'tower' | 'bridge' | 'grandstand' | 'tunnel' }>;
+  readability?: {
+    brakeZones: Array<{ at: number; side: -1 | 1 }>;
+    apexes: Array<{ at: number; side: -1 | 1; kerb: [number, number]; kind: 'apex' | 'exit' }>;
+  };
 }
 
 export interface RacerDefinition {

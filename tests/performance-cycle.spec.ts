@@ -32,6 +32,10 @@ test('keeps renderer and replay budgets stable across repeat race scene rebuilds
     expect(sample.assetStatus.failedAssetIds).toHaveLength(0);
     expect(sample.sceneLifecycle.hasScene).toBe(true);
     expect(sample.sceneLifecycle.cars).toBe(8);
+    expect(sample.sceneDetails.brakeBoardPanels).toBe(12);
+    expect(sample.sceneDetails.apexPosts).toBe(6);
+    expect(sample.sceneDetails.readabilityMarkerInstances).toBe(30);
+    expect(sample.sceneDetails.readabilityInstancedBatches).toBe(3);
     expect(sample.driverRig.activeCars).toBe(8);
     expect(sample.calls).toBeGreaterThan(0);
     expect(sample.calls).toBeLessThan(150);

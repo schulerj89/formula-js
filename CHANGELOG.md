@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.21.0 - 2026-06-26
+
+- Added metadata-driven braking boards before every kerb zone to make corner entries easier to read.
+- Added side-specific visual kerbs and red apex marker posts across all four circuits.
+- Exposed trackside marker metrics and expanded unit/browser coverage for the circuit readability budget.
+
 ## 1.20.0 - 2026-06-26
 
 - Decluttered the default title page by hiding full race setup controls until Garage or a race mode is selected.

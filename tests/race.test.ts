@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import * as THREE from 'three';
 import { cpuRacers, playerTemplate } from '../src/data/racers';
 import { tracks } from '../src/data/tracks';
 import { musicThemes } from '../src/data/audio';
@@ -13,7 +14,7 @@ import { createPositionCommentary, createSpotterCommentary, pickActiveRaceEvent 
 import { createTrackMapLayout, summarizeRaceReadability } from '../src/game/raceReadability';
 import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
-import { createPodiumCeremony } from '../src/game/scene';
+import { buildRaceScene, createPodiumCeremony, type SceneDetailLevel } from '../src/game/scene';
 import { TrackPath } from '../src/game/trackPath';
 import { animateDriverIdle, createFormulaCar, summarizeDriverRig } from '../src/game/models';
 import { createFinaleCommentary, createRacePodiumCommentary } from '../src/game/podiumCommentary';
@@ -62,6 +63,13 @@ describe('track data', () => {
       expect(track.points.length).toBeGreaterThanOrEqual(11);
       expect(track.kerbZones.length).toBeGreaterThanOrEqual(3);
       expect(track.landmarks.length).toBeGreaterThanOrEqual(3);
+      expect(track.readability?.brakeZones).toHaveLength(track.kerbZones.length);
+      expect(track.readability?.apexes).toHaveLength(6);
+      for (const marker of [...(track.readability?.brakeZones ?? []), ...(track.readability?.apexes ?? [])]) {
+        expect([-1, 1]).toContain(marker.side);
+        expect(marker.at).toBeGreaterThanOrEqual(0);
+        expect(marker.at).toBeLessThan(1);
+      }
       expect(new TrackPath(track).length).toBeGreaterThan(650);
     }
   });
@@ -89,6 +97,29 @@ describe('track data', () => {
         expect(x).toBeLessThanOrEqual(layout.size);
         expect(y).toBeGreaterThanOrEqual(0);
         expect(y).toBeLessThanOrEqual(layout.size);
+      }
+    }
+  });
+
+  it('adds braking boards and apex posts to every circuit within the trackside instance budget', () => {
+    const detailLevels: SceneDetailLevel[] = ['battery', 'balanced', 'full'];
+    for (const track of tracks) {
+      for (const detailLevel of detailLevels) {
+        const scene = new THREE.Scene();
+        const build = buildRaceScene(scene, track, [], undefined, detailLevel);
+        expect(build.detailStats.visualKerbSegments).toBe(track.readability?.apexes.length);
+        expect(build.detailStats.kerbInstances).toBeGreaterThan(track.readability?.apexes.length ?? 0);
+        expect(build.detailStats.brakeBoardZones).toBe(track.readability?.brakeZones.length);
+        expect(build.detailStats.brakeBoardPanels).toBe((track.readability?.brakeZones.length ?? 0) * 3);
+        expect(build.detailStats.brakeBoards).toBe(build.detailStats.brakeBoardPanels);
+        expect(build.detailStats.brakeBoardPosts).toBe(build.detailStats.brakeBoards);
+        expect(build.detailStats.apexPosts).toBe(track.readability?.apexes.length);
+        expect(build.detailStats.readabilityMarkerInstances).toBe(
+          build.detailStats.brakeBoardPanels + build.detailStats.brakeBoardPosts + build.detailStats.apexPosts,
+        );
+        expect(build.detailStats.readabilityInstancedBatches).toBe(3);
+        expect(build.detailStats.instancedBatches).toBe(8);
+        expect(build.detailStats.totalInstances).toBeLessThan(detailLevel === 'full' ? 700 : detailLevel === 'balanced' ? 500 : 340);
       }
     }
   });

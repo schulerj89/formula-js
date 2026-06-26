@@ -147,17 +147,35 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
     expect(metrics.sceneDetails.barrierPanels).toBe(208);
     expect(metrics.sceneDetails.sponsorBoards).toBe(42);
     expect(metrics.sceneDetails.tireStacks).toBeGreaterThan(24);
+    expect(metrics.sceneDetails.visualKerbSegments).toBe(6);
+    expect(metrics.sceneDetails.kerbInstances).toBeGreaterThan(20);
+    expect(metrics.sceneDetails.brakeBoardZones).toBe(4);
+    expect(metrics.sceneDetails.brakeBoardPanels).toBe(12);
+    expect(metrics.sceneDetails.brakeBoards).toBe(12);
+    expect(metrics.sceneDetails.brakeBoardPosts).toBe(metrics.sceneDetails.brakeBoards);
+    expect(metrics.sceneDetails.apexPosts).toBe(6);
+    expect(metrics.sceneDetails.readabilityMarkerInstances).toBe(30);
+    expect(metrics.sceneDetails.readabilityInstancedBatches).toBe(3);
     expect(metrics.sceneDetails.pitWallSegments).toBe(18);
   } else {
     expect(metrics.sceneDetails.barrierPanels).toBe(320);
     expect(metrics.sceneDetails.sponsorBoards).toBe(72);
     expect(metrics.sceneDetails.tireStacks).toBeGreaterThan(40);
+    expect(metrics.sceneDetails.visualKerbSegments).toBe(6);
+    expect(metrics.sceneDetails.kerbInstances).toBeGreaterThan(20);
+    expect(metrics.sceneDetails.brakeBoardZones).toBe(4);
+    expect(metrics.sceneDetails.brakeBoardPanels).toBe(12);
+    expect(metrics.sceneDetails.brakeBoards).toBe(12);
+    expect(metrics.sceneDetails.brakeBoardPosts).toBe(metrics.sceneDetails.brakeBoards);
+    expect(metrics.sceneDetails.apexPosts).toBe(6);
+    expect(metrics.sceneDetails.readabilityMarkerInstances).toBe(30);
+    expect(metrics.sceneDetails.readabilityInstancedBatches).toBe(3);
     expect(metrics.sceneDetails.pitWallSegments).toBe(26);
   }
   expect(metrics.sceneDetails.startGridMarks).toBe(16);
   expect(metrics.sceneDetails.gantryLights).toBe(5);
-  expect(metrics.sceneDetails.instancedBatches).toBe(5);
-  expect(metrics.sceneDetails.totalInstances).toBeGreaterThan(isMobile ? 300 : 470);
+  expect(metrics.sceneDetails.instancedBatches).toBe(8);
+  expect(metrics.sceneDetails.totalInstances).toBeGreaterThan(isMobile ? 330 : 500);
   expect(metrics.assetKit.referenceImages.chassis).toContain('formula-chassis-reference.png');
   expect(metrics.assetStatus.generatedReady).toBe(true);
   expect(metrics.assetStatus.loadedAssetIds.sort()).toEqual(['chassis', 'driver', 'wheel']);

@@ -27,6 +27,7 @@ Keep ElevenLabs credentials outside git. The generator reads `ELEVENLABS_API_KEY
 - Five-red-light pre-race start sequence with announcer setup.
 - Queued Arthur/Mags caption exchanges for tutorial, pre-race, replay, podium, and finale beats.
 - Trackside atmosphere with Armco barriers, tire stacks, sponsor boards, pit wall, start grid marks, and a start gantry.
+- Circuit readability markers with brake boards before kerb zones, side-specific red/white kerbs, and red apex posts at each turn complex.
 - World-space podium ceremony with staged top-three cars, winner celebration camera, and higher-confetti campaign finale.
 - Queued podium/finale announcer summaries that call out the winner, player finish, top three, and campaign standings.
 - Bounded end-of-race replay playback from compact race-state samples with timed announcer/radio highlight calls.
