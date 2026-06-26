@@ -7,6 +7,14 @@ export interface SceneBuild {
   path: TrackPath;
   cars: Map<string, THREE.Group>;
   detailStats: TracksideDetailStats;
+  resourceStats: SceneResourceStats;
+}
+
+export interface SceneResourceStats {
+  disposePasses: number;
+  disposedGeometries: number;
+  disposedMaterials: number;
+  retainedSharedGeometries: number;
 }
 
 export interface TracksideDetailStats {
@@ -53,7 +61,7 @@ export function buildRaceScene(
   carFactory: CarFactory = defaultCarFactory,
   detailLevel: SceneDetailLevel = 'full',
 ): SceneBuild {
-  disposeScene(scene);
+  const resourceStats = disposeScene(scene);
   scene.clear();
   scene.background = new THREE.Color(track.palette.sky);
   scene.fog = new THREE.Fog(track.palette.sky, 160, 520);
@@ -85,26 +93,47 @@ export function buildRaceScene(
     cars.set(racer.id, car);
   });
 
-  return { path, cars, detailStats: { ...tracksideDetails.stats, ...kerbs.stats } };
+  return { path, cars, detailStats: { ...tracksideDetails.stats, ...kerbs.stats }, resourceStats };
 }
 
 function defaultCarFactory(racer: RacerDefinition): THREE.Group {
   return createFormulaCar(racer.color, racer.helmet);
 }
 
-function disposeScene(scene: THREE.Scene): void {
+function disposeScene(scene: THREE.Scene): SceneResourceStats {
+  const disposedGeometries = new Set<THREE.BufferGeometry>();
+  const disposedMaterials = new Set<THREE.Material>();
+  const retainedSharedGeometries = new Set<THREE.BufferGeometry>();
   scene.traverse((object) => {
     const mesh = object as THREE.Mesh;
     if ('geometry' in mesh && mesh.geometry) {
-      mesh.geometry.dispose();
+      if (mesh.geometry.userData.sharedResource) {
+        retainedSharedGeometries.add(mesh.geometry);
+      } else if (!disposedGeometries.has(mesh.geometry)) {
+        disposedGeometries.add(mesh.geometry);
+        mesh.geometry.dispose();
+      }
     }
     const material = mesh.material as THREE.Material | THREE.Material[] | undefined;
     if (Array.isArray(material)) {
-      material.forEach((item) => item.dispose());
+      material.forEach((item) => {
+        if (disposedMaterials.has(item)) return;
+        disposedMaterials.add(item);
+        item.dispose();
+      });
+    } else if (material && !disposedMaterials.has(material)) {
+      disposedMaterials.add(material);
+      material.dispose();
     } else {
-      material?.dispose();
+      return;
     }
   });
+  return {
+    disposePasses: 1,
+    disposedGeometries: disposedGeometries.size,
+    disposedMaterials: disposedMaterials.size,
+    retainedSharedGeometries: retainedSharedGeometries.size,
+  };
 }
 
 function createGround(track: TrackDefinition): THREE.Mesh {

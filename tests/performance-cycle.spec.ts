@@ -37,6 +37,9 @@ test('keeps renderer and replay budgets stable across repeat race scene rebuilds
       expect(['prerace', 'race']).toContain(sample.performanceWork.generatedAssetWarmup.blockedState);
       expect(sample.assetStatus.warmupStarted).toBe(false);
     }
+    expect(sample.sceneLifecycle.resources.retainedSharedGeometries).toBeGreaterThan(0);
+    expect(sample.sceneLifecycle.resources.disposedGeometries).toBeGreaterThan(0);
+    expect(sample.sceneLifecycle.resources.disposedMaterials).toBeGreaterThan(0);
     expect(sample.sceneLifecycle.hasScene).toBe(true);
     expect(sample.sceneLifecycle.cars).toBe(8);
     expect(sample.sceneDetails.brakeBoardPanels).toBe(12);

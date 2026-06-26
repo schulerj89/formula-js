@@ -1244,12 +1244,25 @@ function roadSideParkOffset(index: number): number {
 }
 
 function disposeObject(object: THREE.Object3D): void {
+  const disposedGeometries = new Set<THREE.BufferGeometry>();
+  const disposedMaterials = new Set<THREE.Material>();
   object.traverse((item) => {
     const mesh = item as THREE.Mesh;
-    if ('geometry' in mesh && mesh.geometry) mesh.geometry.dispose();
+    if ('geometry' in mesh && mesh.geometry && !mesh.geometry.userData.sharedResource && !disposedGeometries.has(mesh.geometry)) {
+      disposedGeometries.add(mesh.geometry);
+      mesh.geometry.dispose();
+    }
     const material = mesh.material as THREE.Material | THREE.Material[] | undefined;
-    if (Array.isArray(material)) material.forEach((entry) => entry.dispose());
-    else material?.dispose();
+    if (Array.isArray(material)) {
+      material.forEach((entry) => {
+        if (disposedMaterials.has(entry)) return;
+        disposedMaterials.add(entry);
+        entry.dispose();
+      });
+    } else if (material && !disposedMaterials.has(material)) {
+      disposedMaterials.add(material);
+      material.dispose();
+    }
   });
 }
 
@@ -1479,6 +1492,7 @@ function buildDebugMetrics() {
       builds: sceneBuildCount,
       cars: sceneBuild?.cars.size ?? 0,
       hasScene: Boolean(sceneBuild),
+      resources: sceneBuild?.resourceStats ?? null,
     },
     performanceWork: {
       hudDomWrites,

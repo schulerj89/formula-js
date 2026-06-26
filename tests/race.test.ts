@@ -130,6 +130,27 @@ describe('track data', () => {
       }
     }
   });
+
+  it('retains shared procedural car geometries while disposing scene-owned resources on rebuild', () => {
+    const scene = new THREE.Scene();
+    const racers = [{ ...playerTemplate, name: settings.playerName }];
+    const first = buildRaceScene(scene, tracks[0], racers, undefined, 'balanced');
+    const car = [...first.cars.values()][0];
+    let sharedGeometry: THREE.BufferGeometry | null = null;
+    car.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (!sharedGeometry && mesh.isMesh && mesh.geometry.userData.sharedResource) sharedGeometry = mesh.geometry;
+    });
+    expect(sharedGeometry).toBeTruthy();
+    const disposeSpy = vi.spyOn(sharedGeometry!, 'dispose');
+
+    const second = buildRaceScene(scene, tracks[0], racers, undefined, 'balanced');
+
+    expect(disposeSpy).not.toHaveBeenCalled();
+    expect(second.resourceStats.retainedSharedGeometries).toBeGreaterThan(0);
+    expect(second.resourceStats.disposedGeometries).toBeGreaterThan(0);
+    expect(second.resourceStats.disposedMaterials).toBeGreaterThan(0);
+  });
 });
 
 describe('audio data', () => {

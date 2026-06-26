@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.28.0 - 2026-06-26
+
+- Marked shared procedural car geometries as retained resources so scene rebuilds do not dispose reusable fallback geometry.
+- De-duplicated scene geometry/material disposal and exposed resource lifecycle counters in debug metrics.
+- Added unit and browser coverage for shared geometry retention across scene rebuilds.
+
 ## 1.27.0 - 2026-06-26
 
 - Gated optional generated formula-kit warmup so it will not start during pre-race, active race, replay, podium, or finale phases.

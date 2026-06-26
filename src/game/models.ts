@@ -8,6 +8,20 @@ const helmetGeometry = new THREE.SphereGeometry(0.34, 24, 16);
 const torsoGeometry = new THREE.CapsuleGeometry(0.24, 0.36, 6, 12);
 const armGeometry = new THREE.CapsuleGeometry(0.055, 0.46, 4, 8);
 const visorGeometry = new THREE.BoxGeometry(0.46, 0.12, 0.08);
+const cockpitGeometry = new THREE.BoxGeometry(0.82, 0.28, 0.9, 2, 1, 2);
+[
+  bodyGeometry,
+  noseGeometry,
+  wingGeometry,
+  wheelGeometry,
+  helmetGeometry,
+  torsoGeometry,
+  armGeometry,
+  visorGeometry,
+  cockpitGeometry,
+].forEach((geometry) => {
+  geometry.userData.sharedResource = true;
+});
 
 export interface DriverRigOptions {
   includeTorso?: boolean;
@@ -51,7 +65,7 @@ export function createFormulaCar(color: number, helmet: number): THREE.Group {
   rearWing.scale.set(1.08, 1.1, 1.15);
   group.add(rearWing);
 
-  const cockpit = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.28, 0.9, 2, 1, 2), dark);
+  const cockpit = new THREE.Mesh(cockpitGeometry, dark);
   cockpit.position.set(0, 0.82, -0.35);
   group.add(cockpit);
 
