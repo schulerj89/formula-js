@@ -9,8 +9,14 @@ Mobile-first Three.js formula racing game.
 - `npm test` runs data/runtime tests.
 - `npm run screenshot` captures menu, gameplay, and asset-inspector artifacts.
 - `npm run audio:plan` refreshes the dry-run ElevenLabs audio manifest.
-- `npm run audio:generate` generates ElevenLabs MP3s when voice IDs and an API key are configured locally.
+- `npm run audio:check` verifies the ElevenLabs manifest and generated MP3 status.
+- `npm run audio:generate` generates ElevenLabs MP3s when all voice IDs and an API key are configured locally.
+- `npm run audio:generate:partial` explicitly allows generation with missing voice IDs for a music-only or partial pass.
 - `npm run assets:meshy:preview` starts the Meshy preview workflow from the formula-kit manifest when a Meshy key is configured locally.
+
+## Local Audio Credentials
+
+Keep ElevenLabs credentials outside git. The generator reads `ELEVENLABS_API_KEY`, `ELEVENLABS_ARTHUR_VOICE_ID`, `ELEVENLABS_MAGS_VOICE_ID`, and `ELEVENLABS_RADIO_VOICE_ID` from the environment, `.env.local`, `C:/Users/joshs/Projects/elevenlabs-voice-ids.env`, or `C:/Users/joshs/Projects/.env`. The radio team intentionally uses `ELEVENLABS_RADIO_VOICE_ID`, separate from the announcers.
 
 ## Current Slice
 
@@ -29,6 +35,7 @@ Mobile-first Three.js formula racing game.
 - Announcer/radio speech hooks plus optional ElevenLabs MP3 playback when generated assets exist.
 - Radio team lines use their own planned ElevenLabs voice ID and a compressed pit-wall fallback profile.
 - Procedural music and browser speech fallbacks when ElevenLabs assets are missing or blocked.
+- ElevenLabs manifest verification that keeps generated/planned audio files aligned with runtime asset IDs.
 - Dynamic active-race commentary for position gains/losses with cooldown and radio-priority metrics.
 - Player garage paint swatches for body and helmet customization.
 - GPT-image reference art, Meshy preview GLBs, and a runtime loader for modular chassis, wheel, and driver assets.

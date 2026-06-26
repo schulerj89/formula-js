@@ -1,6 +1,6 @@
 {
   "name": "formula-js",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,6 +11,8 @@
     "screenshot": "playwright test tests/screenshot.spec.ts tests/asset-inspector.spec.ts tests/campaign-flow.spec.ts",
     "audio:plan": "node scripts/generate-elevenlabs-assets.mjs",
     "audio:generate": "node scripts/generate-elevenlabs-assets.mjs --generate",
+    "audio:generate:partial": "node scripts/generate-elevenlabs-assets.mjs --generate --allow-partial",
+    "audio:check": "node scripts/verify-elevenlabs-assets.mjs",
     "assets:meshy:preview": "node C:/Users/joshs/.codex/skills/meshy-asset-pipeline/scripts/meshy_text_to_3d_manifest.mjs tools/meshy/formula-kit.manifest.json --preview-only"
   },
   "dependencies": {

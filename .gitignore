@@ -3,4 +3,6 @@ dist/
 playwright-report/
 test-results/
 .env
+.env.*
+elevenlabs-voice-ids.env
 .DS_Store

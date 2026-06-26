@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.13.0 - 2026-06-26
+
+- Added an ElevenLabs asset verification script that checks manifest statuses, duplicate IDs, and generated MP3 presence.
+- Made the ElevenLabs generator load ignored local env files only for real generation without exposing credential values.
+- Guarded full audio generation so missing voice IDs do not silently create a partial asset set unless explicitly requested.
+- Added test coverage that keeps the manifest aligned with runtime audio IDs and the dedicated radio-team voice ID.
+
 ## 1.12.0 - 2026-06-26
 
 - Added a deterministic campaign finish smoke hook that still uses the real race-finish, replay, podium, scoring, and finale transitions.

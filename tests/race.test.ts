@@ -7,6 +7,7 @@ import { bodyPaintOptions, helmetPaintOptions } from '../src/data/customization'
 import { dialogue } from '../src/data/dialogue';
 import { elevenLabsSongAssets, elevenLabsVoiceAssets, matchVoiceAsset } from '../src/data/elevenlabs';
 import { analyzeRaceAudio, RaceAudio } from '../src/game/audio';
+import elevenLabsManifest from '../public/audio/elevenlabs/manifest.json';
 import { analyzeCarContact, analyzeCpuRacecraft, createRace, type RacerState } from '../src/game/race';
 import { createPositionCommentary, createSpotterCommentary, pickActiveRaceEvent } from '../src/game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability } from '../src/game/raceReadability';
@@ -126,6 +127,31 @@ describe('audio data', () => {
     expect(matchVoiceAsset('Radio', 'Damage is climbing. Stay off the outside kerbs and bring it home.')?.id).toBe('radio-team-damage');
     expect(matchVoiceAsset('Radio', 'Contact confirmed. Check the front wing and give them space.')?.id).toBe('radio-team-contact');
     expect(matchVoiceAsset('Radio', 'Tyres are fading. Brake earlier and keep the steering smooth.')?.id).toBe('radio-team-tires');
+  });
+
+  it('keeps the ElevenLabs manifest aligned with runtime assets and the dedicated radio voice ID', () => {
+    expect(elevenLabsManifest.voiceLines.map((asset) => asset.id).sort()).toEqual(
+      elevenLabsVoiceAssets.map((asset) => asset.id).sort(),
+    );
+    expect(elevenLabsManifest.songs.map((asset) => asset.id).sort()).toEqual(elevenLabsSongAssets.map((asset) => asset.id).sort());
+    for (const manifestAsset of elevenLabsManifest.voiceLines) {
+      const runtimeAsset = elevenLabsVoiceAssets.find((asset) => asset.id === manifestAsset.id);
+      expect(runtimeAsset?.src).toBe(manifestAsset.file.replace(/^public/, ''));
+      expect(matchVoiceAsset(manifestAsset.speaker, manifestAsset.text.replace('{track}', 'Silverpine Switchback'))?.id).toBe(manifestAsset.id);
+    }
+    for (const manifestAsset of elevenLabsManifest.songs) {
+      const runtimeAsset = elevenLabsSongAssets.find((asset) => asset.id === manifestAsset.id);
+      expect(runtimeAsset?.src).toBe(manifestAsset.file.replace(/^public/, ''));
+    }
+    expect(
+      elevenLabsManifest.voiceLines
+        .filter((asset) => asset.speaker === 'Radio')
+        .map((asset) => asset.voiceEnv)
+        .sort(),
+    ).toEqual(['ELEVENLABS_RADIO_VOICE_ID', 'ELEVENLABS_RADIO_VOICE_ID', 'ELEVENLABS_RADIO_VOICE_ID']);
+    expect(elevenLabsManifest.voiceLines.some((asset) => asset.speaker === 'Radio' && asset.voiceEnv !== 'ELEVENLABS_RADIO_VOICE_ID')).toBe(
+      false,
+    );
   });
 
   it('maps race state into gear, rev, tire, and kerb audio feedback', () => {

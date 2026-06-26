@@ -6,6 +6,18 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.join(root, 'public', 'audio', 'elevenlabs');
 const dryRun = !process.argv.includes('--generate');
+const allowPartial = process.argv.includes('--allow-partial');
+const localEnvPaths = [
+  path.join(root, '.env.local'),
+  'C:/Users/joshs/Projects/elevenlabs-voice-ids.env',
+  'C:/Users/joshs/Projects/.env',
+];
+const secretEnvKeys = new Set([
+  'ELEVENLABS_API_KEY',
+  'ELEVENLABS_ARTHUR_VOICE_ID',
+  'ELEVENLABS_MAGS_VOICE_ID',
+  'ELEVENLABS_RADIO_VOICE_ID',
+]);
 
 const voiceLines = [
   {
@@ -67,8 +79,17 @@ const songs = [
   },
 ];
 
+if (!dryRun) await loadLocalEnvFiles();
 await mkdir(outDir, { recursive: true });
-const apiKey = await loadApiKey();
+const apiKey = dryRun ? '' : await loadApiKey();
+const missingVoiceLines = voiceLines.filter((line) => !process.env[line.voiceEnv] && !existsSync(path.join(outDir, `${line.id}.mp3`)));
+if (!dryRun && missingVoiceLines.length > 0 && !allowPartial) {
+  const missingVoiceEnvs = [...new Set(missingVoiceLines.map((line) => line.voiceEnv))].sort();
+  throw new Error(
+    `Missing ElevenLabs voice IDs for ${missingVoiceEnvs.join(', ')}. Set them in the environment or an ignored local env file, or rerun with --allow-partial.`,
+  );
+}
+
 const manifest = {
   generatedAt: new Date().toISOString(),
   dryRun,
@@ -83,12 +104,14 @@ const manifest = {
 for (const line of voiceLines) {
   const voiceId = process.env[line.voiceEnv];
   const file = path.join(outDir, `${line.id}.mp3`);
+  const generated = existsSync(file);
+  const status = generated ? 'generated' : dryRun ? 'planned' : voiceId ? 'generated' : 'missing_voice_id';
   manifest.voiceLines.push({
     ...line,
     file: `public/audio/elevenlabs/${line.id}.mp3`,
-    status: dryRun ? 'planned' : voiceId ? 'generated' : 'missing_voice_id',
+    status,
   });
-  if (dryRun || !voiceId) continue;
+  if (dryRun || !voiceId || generated) continue;
   const bytes = await postAudio(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
     text: line.text,
     model_id: 'eleven_multilingual_v2',
@@ -104,12 +127,13 @@ for (const line of voiceLines) {
 
 for (const song of songs) {
   const file = path.join(outDir, `${song.id}.mp3`);
+  const generated = existsSync(file);
   manifest.songs.push({
     ...song,
     file: `public/audio/elevenlabs/${song.id}.mp3`,
-    status: dryRun ? 'planned' : 'generated',
+    status: generated || !dryRun ? 'generated' : 'planned',
   });
-  if (dryRun) continue;
+  if (dryRun || generated) continue;
   const bytes = await postAudio('https://api.elevenlabs.io/v1/music?output_format=mp3_44100_128', {
     prompt: song.prompt,
     music_length_ms: song.music_length_ms,
@@ -144,4 +168,20 @@ async function loadApiKey() {
   const localKeyPath = 'C:/Users/joshs/Projects/eleven-labs-api-key.txt';
   if (!existsSync(localKeyPath)) return '';
   return (await readFile(localKeyPath, 'utf8')).trim();
+}
+
+async function loadLocalEnvFiles() {
+  for (const envPath of localEnvPaths) {
+    if (!existsSync(envPath)) continue;
+    const contents = await readFile(envPath, 'utf8');
+    for (const rawLine of contents.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+      const separator = line.indexOf('=');
+      if (separator <= 0) continue;
+      const key = line.slice(0, separator).trim();
+      if (!secretEnvKeys.has(key) || process.env[key]) continue;
+      process.env[key] = line.slice(separator + 1).trim().replace(/^['"]|['"]$/g, '');
+    }
+  }
 }
