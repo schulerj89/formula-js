@@ -13,7 +13,7 @@ import { animateDriverIdle, summarizeDriverRig } from './game/models';
 import { createFinaleCommentary, createRacePodiumCommentary, type PodiumCommentaryEvent, type PodiumCommentaryKind } from './game/podiumCommentary';
 import { createPreRaceCommentary } from './game/preRaceCommentary';
 import { createRace, createResults, type RaceControl, type RaceSnapshot } from './game/race';
-import { pickActiveRaceEvent, type RaceCommentaryKind } from './game/raceCommentary';
+import { pickActiveRaceEvent, type RaceCommentaryKind, type RadioWarningKey } from './game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability, type TrackMapLayout } from './game/raceReadability';
 import { createReplayRecorder, findReplayFrame, type RaceReplay, type ReplayHighlightEvent, type ReplayRecorder } from './game/replay';
 import { buildRaceScene, createPodiumCeremony, type PodiumCeremonyStats, type SceneBuild, type SceneDetailLevel } from './game/scene';
@@ -51,6 +51,7 @@ let lightTimer = 0;
 let lightsOn = 0;
 let lastLightBeep = 0;
 let lastRadio = '';
+const deliveredRadioKeys: RadioWarningKey[] = [];
 let lastContactRadioEvent = 0;
 let raceCommentaryElapsed = 0;
 let lastCommentaryPosition: number | null = null;
@@ -539,6 +540,7 @@ function startPreRace(): void {
   lastLightBeep = 0;
   lastContactRadioEvent = 0;
   lastRadio = '';
+  deliveredRadioKeys.length = 0;
   raceCommentaryElapsed = 0;
   lastCommentaryPosition = null;
   lastRaceCommentaryAt = -999;
@@ -922,6 +924,7 @@ function updateRaceAnnouncements(snapshot: RaceSnapshot, force = false): void {
     playerName: settings.playerName,
     lastRadio,
     lastContactRadioEvent,
+    deliveredRadioKeys,
   });
   if (!event) return;
   const eventSignature = `${event.lineId}:${event.focusRacerId ?? 'none'}`;
@@ -943,7 +946,10 @@ function updateRaceAnnouncements(snapshot: RaceSnapshot, force = false): void {
   lastRaceCommentarySpeaker = event.speaker;
   lastRaceCommentaryFocusRacerId = event.focusRacerId;
   if (event.radioKey === 'contact') lastContactRadioEvent = snapshot.player.contactEvents;
-  if (event.radioKey) lastRadio = event.radioKey;
+  if (event.radioKey) {
+    lastRadio = event.radioKey;
+    if (!deliveredRadioKeys.includes(event.radioKey)) deliveredRadioKeys.push(event.radioKey);
+  }
   showCaption(event.speaker, event.text);
 }
 
@@ -1621,6 +1627,7 @@ function buildDebugMetrics() {
       lastPriority: lastRaceCommentaryPriority,
       lastSpeaker: lastRaceCommentarySpeaker,
       lastFocusRacerId: lastRaceCommentaryFocusRacerId,
+      deliveredRadioKeys: [...deliveredRadioKeys],
       cooldownRemaining: Math.max(0, Math.round((4.4 - (raceCommentaryElapsed - lastRaceCommentaryAt)) * 10) / 10),
     },
     campaignLeader: campaignLeader(campaignScores)?.name ?? null,

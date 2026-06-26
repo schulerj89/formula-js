@@ -9,6 +9,7 @@ export type RaceCommentaryKind =
   | 'position-lost'
   | 'spotter-side'
   | 'spotter-closing';
+export type RadioWarningKey = 'contact' | 'damage' | 'tires';
 
 export interface RaceCommentaryEvent {
   kind: RaceCommentaryKind;
@@ -17,7 +18,7 @@ export interface RaceCommentaryEvent {
   speaker: 'Arthur Bell' | 'Mags Whitlow' | 'Radio';
   text: string;
   focusRacerId: string | null;
-  radioKey: 'contact' | 'damage' | 'tires' | null;
+  radioKey: RadioWarningKey | null;
 }
 
 export interface ActiveRaceEventInput {
@@ -27,11 +28,12 @@ export interface ActiveRaceEventInput {
   playerName: string;
   lastRadio: string;
   lastContactRadioEvent: number;
+  deliveredRadioKeys?: readonly RadioWarningKey[];
 }
 
 export function pickActiveRaceEvent(input: ActiveRaceEventInput): RaceCommentaryEvent | null {
   const candidates = [
-    createCriticalRadioEvent(input.snapshot, input.lastRadio, input.lastContactRadioEvent),
+    createCriticalRadioEvent(input.snapshot, input.lastRadio, input.lastContactRadioEvent, input.deliveredRadioKeys ?? []),
     createSpotterCommentary(input.summary),
     createPositionCommentary(input.previousPosition, input.snapshot, input.playerName),
   ].filter((event): event is RaceCommentaryEvent => Boolean(event));
@@ -93,7 +95,13 @@ export function createSpotterCommentary(summary: RaceReadabilitySummary): RaceCo
   return null;
 }
 
-function createCriticalRadioEvent(snapshot: RaceSnapshot, lastRadio: string, lastContactRadioEvent: number): RaceCommentaryEvent | null {
+function createCriticalRadioEvent(
+  snapshot: RaceSnapshot,
+  lastRadio: string,
+  lastContactRadioEvent: number,
+  deliveredRadioKeys: readonly RadioWarningKey[],
+): RaceCommentaryEvent | null {
+  const delivered = new Set(deliveredRadioKeys);
   if (snapshot.player.contactEvents > lastContactRadioEvent && snapshot.player.lastContactSeverity > 0.22) {
     return {
       kind: 'radio-team-contact',
@@ -105,7 +113,7 @@ function createCriticalRadioEvent(snapshot: RaceSnapshot, lastRadio: string, las
       radioKey: 'contact',
     };
   }
-  if (snapshot.player.damage < 0.45 && lastRadio !== 'damage') {
+  if (snapshot.player.damage < 0.45 && lastRadio !== 'damage' && !delivered.has('damage')) {
     return {
       kind: 'radio-team-damage',
       lineId: 'radio.damage.climbing',
@@ -116,7 +124,7 @@ function createCriticalRadioEvent(snapshot: RaceSnapshot, lastRadio: string, las
       radioKey: 'damage',
     };
   }
-  if (snapshot.player.tires < 0.38 && lastRadio !== 'tires') {
+  if (snapshot.player.tires < 0.38 && lastRadio !== 'tires' && !delivered.has('tires')) {
     return {
       kind: 'radio-team-tires',
       lineId: 'radio.tires.fading',

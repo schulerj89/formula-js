@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.29.1 - 2026-06-26
+
+- Latched critical damage and tyre radio warnings per race so low-health calls do not alternate every frame once both systems are critical.
+- Kept replay tyre-condition highlights on the radio voice to match active-race low-health warnings.
+- Exposed delivered radio warning keys in debug metrics and added unit coverage for the damage-then-tyre warning sequence.
+
 ## 1.29.0 - 2026-06-26
 
 - Reworked the title into a CSS-only motorsport wordmark with split-line styling, race-accent bars, and local fallback fonts.

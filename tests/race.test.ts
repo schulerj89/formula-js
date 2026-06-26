@@ -707,6 +707,48 @@ describe('race simulation', () => {
     expect(event?.focusRacerId).toBe('cpu-1');
   });
 
+  it('latches critical damage and tire radio so low-health warnings do not alternate every frame', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    const snapshot = race.snapshot();
+    snapshot.player.damage = 0.32;
+    snapshot.player.tires = 0.24;
+    const summary = summarizeRaceReadability(snapshot, tracks[0]);
+
+    const damageEvent = pickActiveRaceEvent({
+      previousPosition: snapshot.position,
+      snapshot,
+      summary,
+      playerName: settings.playerName,
+      lastRadio: '',
+      lastContactRadioEvent: 0,
+      deliveredRadioKeys: [],
+    });
+    const tireEvent = pickActiveRaceEvent({
+      previousPosition: snapshot.position,
+      snapshot,
+      summary,
+      playerName: settings.playerName,
+      lastRadio: 'damage',
+      lastContactRadioEvent: 0,
+      deliveredRadioKeys: ['damage'],
+    });
+    const exhausted = pickActiveRaceEvent({
+      previousPosition: snapshot.position,
+      snapshot,
+      summary,
+      playerName: settings.playerName,
+      lastRadio: 'tires',
+      lastContactRadioEvent: 0,
+      deliveredRadioKeys: ['damage', 'tires'],
+    });
+
+    expect(damageEvent?.lineId).toBe('radio.damage.climbing');
+    expect(tireEvent?.lineId).toBe('radio.tires.fading');
+    expect(exhausted?.priority ?? 0).toBeLessThan(4);
+    expect(['radio-team-damage', 'radio-team-tires']).not.toContain(exhausted?.kind);
+  });
+
   it('creates stable spotter commentary for fast closing traffic', () => {
     const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
     const race = createRace('timeAttack', tracks[0], racers, settings);
@@ -893,6 +935,7 @@ describe('replay recording', () => {
     expect(events.map((event) => event.kind)).toEqual(['opening', 'move', 'damage', 'tires', 'finish']);
     expect(events.every((event, index) => index === 0 || event.time >= events[index - 1].time)).toBe(true);
     expect(events.find((event) => event.kind === 'damage')?.speaker).toBe('Radio');
+    expect(events.find((event) => event.kind === 'tires')?.speaker).toBe('Radio');
     expect(events.find((event) => event.kind === 'finish')?.focusRacerId).toBe('rival');
   });
 

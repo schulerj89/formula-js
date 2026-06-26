@@ -157,7 +157,7 @@ export function createReplayEvents(trackName: string, playerName: string, durati
     events.push({
       time: boundedReplayTime(safeDuration, safeDuration * 0.7),
       kind: 'tires',
-      speaker: 'Arthur Bell',
+      speaker: 'Radio',
       text: 'The tyres were fading here, and every steering input started costing lap time.',
       focusRacerId: 'player',
     });
