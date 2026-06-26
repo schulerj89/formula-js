@@ -38,6 +38,14 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.estimatedFps).toBeGreaterThan(0);
   expect(metrics.p95FrameMs).toBeGreaterThan(0);
   expect(metrics.audio.musicCue).toBe('Silent');
+  expect(metrics.sceneDetails.barrierPanels).toBe(320);
+  expect(metrics.sceneDetails.sponsorBoards).toBe(72);
+  expect(metrics.sceneDetails.tireStacks).toBeGreaterThan(40);
+  expect(metrics.sceneDetails.pitWallSegments).toBe(26);
+  expect(metrics.sceneDetails.startGridMarks).toBe(16);
+  expect(metrics.sceneDetails.gantryLights).toBe(5);
+  expect(metrics.sceneDetails.instancedBatches).toBe(5);
+  expect(metrics.sceneDetails.totalInstances).toBeGreaterThan(470);
   expect(metrics.assetKit.referenceImages.chassis).toContain('formula-chassis-reference.png');
   expect(metrics.assetStatus.generatedReady).toBe(true);
   expect(metrics.assetStatus.runtimeMode).toBe('mixed');

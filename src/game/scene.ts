@@ -6,6 +6,18 @@ import { TrackPath } from './trackPath';
 export interface SceneBuild {
   path: TrackPath;
   cars: Map<string, THREE.Group>;
+  detailStats: TracksideDetailStats;
+}
+
+export interface TracksideDetailStats {
+  barrierPanels: number;
+  sponsorBoards: number;
+  tireStacks: number;
+  pitWallSegments: number;
+  startGridMarks: number;
+  gantryLights: number;
+  instancedBatches: number;
+  totalInstances: number;
 }
 
 const roadWidth = 11;
@@ -29,6 +41,8 @@ export function buildRaceScene(scene: THREE.Scene, track: TrackDefinition, racer
   scene.add(createKerbs(path, track));
   scene.add(createScenery(path, track));
   scene.add(createLandmarks(path, track));
+  const tracksideDetails = createTracksideDetails(path, track);
+  scene.add(tracksideDetails.group);
 
   const cars = new Map<string, THREE.Group>();
   racers.forEach((racer, index) => {
@@ -41,7 +55,7 @@ export function buildRaceScene(scene: THREE.Scene, track: TrackDefinition, racer
     cars.set(racer.id, car);
   });
 
-  return { path, cars };
+  return { path, cars, detailStats: tracksideDetails.stats };
 }
 
 function defaultCarFactory(racer: RacerDefinition): THREE.Group {
@@ -214,4 +228,141 @@ function createLandmarks(path: TrackPath, track: TrackDefinition): THREE.Group {
     group.add(mesh);
   }
   return group;
+}
+
+function createTracksideDetails(path: TrackPath, track: TrackDefinition): { group: THREE.Group; stats: TracksideDetailStats } {
+  const group = new THREE.Group();
+  group.name = 'trackside-atmosphere';
+
+  const barrierPanels = 320;
+  const barrierGeo = new THREE.BoxGeometry(4.4, 0.62, 0.18, 1, 1, 1);
+  const barrierMat = new THREE.MeshLambertMaterial({ color: track.scenery === 'city' ? 0x9ea8b4 : 0xd4d8dc });
+  const barriers = new THREE.InstancedMesh(barrierGeo, barrierMat, barrierPanels);
+  const matrix = new THREE.Matrix4();
+  const rotation = new THREE.Quaternion();
+  const scale = new THREE.Vector3(1, 1, 1);
+
+  for (let i = 0; i < barrierPanels; i += 1) {
+    const p = (i % (barrierPanels / 2)) / (barrierPanels / 2);
+    const side = i < barrierPanels / 2 ? -1 : 1;
+    const pose = path.poseAt(p, side * (roadWidth / 2 + 2.15));
+    const position = pose.position.clone();
+    position.y = 0.48;
+    rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw + Math.PI / 2);
+    matrix.compose(position, rotation, scale);
+    barriers.setMatrixAt(i, matrix);
+  }
+  barriers.instanceMatrix.needsUpdate = true;
+
+  const sponsorBoards = 72;
+  const boardGeo = new THREE.BoxGeometry(6.4, 2.1, 0.22, 1, 1, 1);
+  const boardMat = new THREE.MeshLambertMaterial({ color: track.palette.accent });
+  const boards = new THREE.InstancedMesh(boardGeo, boardMat, sponsorBoards);
+  for (let i = 0; i < sponsorBoards; i += 1) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const p = (0.035 + i * 0.029) % 1;
+    const pose = path.poseAt(p, side * (roadWidth / 2 + 8.8 + (i % 3) * 1.1));
+    const position = pose.position.clone();
+    position.y = 1.2;
+    rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw + Math.PI / 2);
+    matrix.compose(position, rotation, scale);
+    boards.setMatrixAt(i, matrix);
+  }
+  boards.instanceMatrix.needsUpdate = true;
+
+  const tireStackMatrices: THREE.Matrix4[] = [];
+  const tireStackGeo = new THREE.CylinderGeometry(0.72, 0.72, 0.75, 18, 1);
+  const tireStackMat = new THREE.MeshLambertMaterial({ color: 0x0b0c0e });
+  for (const [start, end] of track.kerbZones) {
+    for (let p = start; p < end; p += 0.016) {
+      for (const side of [-1, 1]) {
+        const pose = path.poseAt(p, side * (roadWidth / 2 + 5.6));
+        const position = pose.position.clone();
+        position.y = 0.38;
+        rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw);
+        scale.set(1, 0.9 + ((tireStackMatrices.length + track.difficulty) % 3) * 0.28, 1);
+        const tireMatrix = new THREE.Matrix4();
+        tireMatrix.compose(position, rotation, scale);
+        tireStackMatrices.push(tireMatrix);
+      }
+    }
+  }
+  const tireStacks = new THREE.InstancedMesh(tireStackGeo, tireStackMat, Math.max(1, tireStackMatrices.length));
+  tireStackMatrices.forEach((item, index) => tireStacks.setMatrixAt(index, item));
+  tireStacks.count = tireStackMatrices.length;
+  tireStacks.instanceMatrix.needsUpdate = true;
+
+  const pitWallSegments = 26;
+  const pitWallGeo = new THREE.BoxGeometry(2.4, 0.7, 0.34, 1, 1, 1);
+  const pitWallMat = new THREE.MeshLambertMaterial({ color: 0xf3f5f8 });
+  const pitWall = new THREE.InstancedMesh(pitWallGeo, pitWallMat, pitWallSegments);
+  for (let i = 0; i < pitWallSegments; i += 1) {
+    const pose = path.poseAt(0.895 + i * 0.0045, roadWidth / 2 + 1.25);
+    const position = pose.position.clone();
+    position.y = 0.36;
+    rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw + Math.PI / 2);
+    matrix.compose(position, rotation, new THREE.Vector3(1, 1, 1));
+    pitWall.setMatrixAt(i, matrix);
+  }
+  pitWall.instanceMatrix.needsUpdate = true;
+
+  const startGridMarks = 16;
+  const gridGeo = new THREE.BoxGeometry(2.15, 0.035, 0.18, 1, 1, 1);
+  const gridMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const gridMarks = new THREE.InstancedMesh(gridGeo, gridMat, startGridMarks);
+  for (let i = 0; i < startGridMarks; i += 1) {
+    const lane = i % 2 === 0 ? -1.45 : 1.45;
+    const row = Math.floor(i / 2);
+    const pose = path.poseAt(0.983 - row * 0.0058, lane);
+    const position = pose.position.clone();
+    position.y = 0.055;
+    rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw + Math.PI / 2);
+    matrix.compose(position, rotation, new THREE.Vector3(1, 1, 1));
+    gridMarks.setMatrixAt(i, matrix);
+  }
+  gridMarks.instanceMatrix.needsUpdate = true;
+
+  group.add(barriers, boards, tireStacks, pitWall, gridMarks, createStartGantry(path, track));
+  return {
+    group,
+    stats: {
+      barrierPanels,
+      sponsorBoards,
+      tireStacks: tireStackMatrices.length,
+      pitWallSegments,
+      startGridMarks,
+      gantryLights: 5,
+      instancedBatches: 5,
+      totalInstances: barrierPanels + sponsorBoards + tireStackMatrices.length + pitWallSegments + startGridMarks,
+    },
+  };
+}
+
+function createStartGantry(path: TrackPath, track: TrackDefinition): THREE.Group {
+  const pose = path.poseAt(0.992, 0);
+  const gantry = new THREE.Group();
+  gantry.name = 'start-gantry';
+  gantry.position.copy(pose.position);
+  gantry.rotation.y = pose.yaw;
+
+  const steel = new THREE.MeshLambertMaterial({ color: 0x23282e });
+  const accent = new THREE.MeshLambertMaterial({ color: track.palette.accent });
+  const red = new THREE.MeshBasicMaterial({ color: 0xe8141f });
+
+  const leftColumn = new THREE.Mesh(new THREE.BoxGeometry(0.55, 6.2, 0.55), steel);
+  leftColumn.position.set(-7.25, 3.1, 0);
+  const rightColumn = leftColumn.clone();
+  rightColumn.position.x = 7.25;
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(15.2, 0.55, 0.62), steel);
+  beam.position.set(0, 6.25, 0);
+  const lightBar = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.8, 0.45), accent);
+  lightBar.position.set(0, 5.6, -0.18);
+
+  gantry.add(leftColumn, rightColumn, beam, lightBar);
+  for (let i = 0; i < 5; i += 1) {
+    const light = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 8), red);
+    light.position.set(-2.4 + i * 1.2, 5.6, -0.52);
+    gantry.add(light);
+  }
+  return gantry;
 }

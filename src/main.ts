@@ -757,6 +757,7 @@ function exposeDebug(): void {
     replaySampleRate: lastReplay?.sampleRate ?? 0,
     lightsOn,
     campaignLeader: campaignLeader(campaignScores)?.name ?? null,
+    sceneDetails: sceneBuild?.detailStats ?? null,
     audio: audio.metrics(),
     assetKit: formulaAssetManifest,
     assetStatus: formulaAssets.metrics(),

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0 - 2026-06-26
+
+- Added instanced trackside atmosphere: Armco barriers, sponsor boards, tire stacks, pit wall segments, start grid marks, and a physical start gantry.
+- Exposed trackside detail counts in debug metrics so browser smoke tests can verify the visual layer.
+- Kept repeated trackside objects batched through `InstancedMesh` to protect draw-call and geometry budgets.
+- Added 0.7.0 gameplay/menu screenshots covering the richer track environment.
+
 ## 0.6.0 - 2026-06-26
 
 - Generated Meshy preview GLBs for the formula chassis, wheel, and driver kit under the per-asset byte cap.
