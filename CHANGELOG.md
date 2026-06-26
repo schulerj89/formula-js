@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.22.0 - 2026-06-26
+
+- Added track-specific pre-race commentary banks for all four circuits.
+- Queued Arthur/Mags pre-race lines from the selected track before the five-light setup.
+- Exposed pre-race commentary line IDs in debug metrics and added unit/browser coverage.
+
 ## 1.21.0 - 2026-06-26
 
 - Added metadata-driven braking boards before every kerb zone to make corner entries easier to read.

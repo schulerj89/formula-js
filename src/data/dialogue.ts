@@ -26,6 +26,24 @@ export const dialogue = {
     ['Arthur Bell', '{track} looks magnificent today: fast entries, dangerous exits, and very honest kerbs.'],
     ['Mags Whitlow', '{player} has Luca Venn and Maya Cross breathing down the gearbox already. Lovely and tense.'],
   ],
+  preraceByTrack: {
+    silverpine: [
+      ['Arthur Bell', '{track} asks for patience through the trees: quick entries, late exits, and no argument with the kerbs.'],
+      ['Mags Whitlow', '{player} has a forest, a bridge, and seven rivals all pretending this is perfectly relaxing.'],
+    ],
+    marina: [
+      ['Arthur Bell', '{track} is narrow, polished, and unforgiving from the harbour tunnel to the sea wall stand.'],
+      ['Mags Whitlow', 'Lovely view, terrible place to run out of talent. {player} will need tidy hands today.'],
+    ],
+    neon: [
+      ['Arthur Bell', '{track} is all braking references and city rhythm, with the metro flyover waiting to punish hesitation.'],
+      ['Mags Whitlow', 'Under the neon, every mistake gets better lighting. No pressure, {player}.'],
+    ],
+    valkyrie: [
+      ['Arthur Bell', '{track} is the longest and sternest test: ridge tunnel, summit tower, and commitment over every crest.'],
+      ['Mags Whitlow', 'Norway has brought mountains, cold air, and absolutely no sympathy for sloppy exits from {player}.'],
+    ],
+  },
   lights: [
     ['Arthur Bell', 'The lights are coming on. Hold steady.'],
     ['Mags Whitlow', 'Five red lights, then it is noise, nerves, and no excuses.'],

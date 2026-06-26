@@ -18,6 +18,7 @@ import { buildRaceScene, createPodiumCeremony, type SceneDetailLevel } from '../
 import { TrackPath } from '../src/game/trackPath';
 import { animateDriverIdle, createFormulaCar, summarizeDriverRig } from '../src/game/models';
 import { createFinaleCommentary, createRacePodiumCommentary } from '../src/game/podiumCommentary';
+import { createPreRaceCommentary } from '../src/game/preRaceCommentary';
 import type { GameSettings } from '../src/types';
 
 const settings: GameSettings = {
@@ -130,6 +131,30 @@ describe('audio data', () => {
     for (const bank of [dialogue.tutorial, dialogue.prerace, dialogue.replay, dialogue.podium, dialogue.finale]) {
       expect(new Set(bank.map(([speaker]) => speaker))).toEqual(new Set(['Arthur Bell', 'Mags Whitlow']));
     }
+    for (const bank of Object.values(dialogue.preraceByTrack)) {
+      expect(bank).toHaveLength(2);
+      expect(new Set(bank.map(([speaker]) => speaker))).toEqual(new Set(['Arthur Bell', 'Mags Whitlow']));
+    }
+  });
+
+  it('creates distinct two-announcer pre-race commentary for each track and player', () => {
+    const seenTexts = new Set<string>();
+    expect(Object.keys(dialogue.preraceByTrack).sort()).toEqual(tracks.map((track) => track.id).sort());
+    for (const track of tracks) {
+      const lines = createPreRaceCommentary(track, 'Juno Vale');
+      expect(lines).toHaveLength(2);
+      expect(new Set(lines.map((line) => line.speaker))).toEqual(new Set(['Arthur Bell', 'Mags Whitlow']));
+      expect(lines.every((line) => line.trackId === track.id)).toBe(true);
+      expect(lines.map((line) => line.lineId)).toEqual([`arthur.prerace.${track.id}.track`, `mags.prerace.${track.id}.rivals`]);
+      expect(lines[0].text).toContain(track.name);
+      expect(lines[1].text).toContain('Juno Vale');
+      for (const line of lines) {
+        expect(line.text).not.toContain('{track}');
+        expect(line.text).not.toContain('{player}');
+        seenTexts.add(line.text);
+      }
+    }
+    expect(seenTexts.size).toBe(tracks.length * 2);
   });
 
   it('defines four non-race music themes with distinct titles and tempos', () => {

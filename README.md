@@ -25,7 +25,7 @@ Keep ElevenLabs credentials outside git. The generator reads `ELEVENLABS_API_KEY
 - Browser smoke coverage clicks through the Campaign podium and Finale path using deterministic race finishes.
 - Tutorial panel with launch, braking, tyre, and damage guidance.
 - Five-red-light pre-race start sequence with announcer setup.
-- Queued Arthur/Mags caption exchanges for tutorial, pre-race, replay, podium, and finale beats.
+- Queued Arthur/Mags caption exchanges for tutorial, track-specific pre-race, replay, podium, and finale beats.
 - Trackside atmosphere with Armco barriers, tire stacks, sponsor boards, pit wall, start grid marks, and a start gantry.
 - Circuit readability markers with brake boards before kerb zones, side-specific red/white kerbs, and red apex posts at each turn complex.
 - World-space podium ceremony with staged top-three cars, winner celebration camera, and higher-confetti campaign finale.

@@ -48,6 +48,8 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   const preraceMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
   expect(preraceMetrics.captionSequence.delivered).toBeGreaterThanOrEqual(2);
   expect(preraceMetrics.captionSequence.speakers.sort()).toEqual(['Arthur Bell', 'Mags Whitlow']);
+  expect(preraceMetrics.preRaceCommentary.trackId).toBe('silverpine');
+  expect(preraceMetrics.preRaceCommentary.lineIds).toEqual(['arthur.prerace.silverpine.track', 'mags.prerace.silverpine.rivals']);
   await page.screenshot({ path: testInfo.outputPath('start-lights.png'), fullPage: true });
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'race');
   await expect(page.locator('#startLights')).toBeHidden();

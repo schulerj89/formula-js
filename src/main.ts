@@ -11,6 +11,7 @@ import { applyCampaignResults, campaignLeader, createCampaignScores, type Campai
 import { createFormulaAssetManager } from './game/formulaAssets';
 import { animateDriverIdle, summarizeDriverRig } from './game/models';
 import { createFinaleCommentary, createRacePodiumCommentary, type PodiumCommentaryEvent, type PodiumCommentaryKind } from './game/podiumCommentary';
+import { createPreRaceCommentary } from './game/preRaceCommentary';
 import { createRace, createResults, type RaceControl, type RaceSnapshot } from './game/race';
 import { pickActiveRaceEvent, type RaceCommentaryKind } from './game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability, type TrackMapLayout } from './game/raceReadability';
@@ -64,6 +65,8 @@ let lastRaceCommentaryLineId: string | null = null;
 let lastRaceCommentaryPriority: number | null = null;
 let lastRaceCommentarySpeaker: string | null = null;
 let lastRaceCommentaryFocusRacerId: string | null = null;
+let preRaceCommentaryTrackId: string | null = null;
+let preRaceCommentaryLineIds: string[] = [];
 let campaignTrackIndex = 0;
 let uiBound = false;
 let replayRecorder: ReplayRecorder | null = null;
@@ -534,6 +537,9 @@ function startPreRace(): void {
   lastRaceCommentaryPriority = null;
   lastRaceCommentarySpeaker = null;
   lastRaceCommentaryFocusRacerId = null;
+  const preRaceCommentary = createPreRaceCommentary(selectedTrack, settings.playerName);
+  preRaceCommentaryTrackId = selectedTrack.id;
+  preRaceCommentaryLineIds = preRaceCommentary.map((line) => line.lineId);
   updateStartLights();
   startLights.classList.add('active');
   showScreen(null);
@@ -548,7 +554,7 @@ function startPreRace(): void {
   lastCommentaryPosition = latestSnapshot.position;
   replayRecorder.record(0, latestSnapshot);
   lightTimer = preraceSequenceSeconds;
-  queueDialogue([...dialogue.prerace, dialogue.lights[0]], 2.1);
+  queueDialogue([...preRaceCommentary.map((line) => [line.speaker, line.text] as const), dialogue.lights[0]], 2.1);
 }
 
 function startRace(): void {
@@ -1466,6 +1472,10 @@ function buildDebugMetrics() {
       pending: captionQueue.length,
       delivered: captionQueueDelivered,
       speakers: captionQueueSpeakers,
+    },
+    preRaceCommentary: {
+      trackId: preRaceCommentaryTrackId,
+      lineIds: preRaceCommentaryLineIds,
     },
     raceReadability: {
       trackMapActive: Boolean(trackMapLayout),
