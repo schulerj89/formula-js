@@ -4,8 +4,10 @@ import { dialogue } from './data/dialogue';
 import { cpuRacers, playerTemplate } from './data/racers';
 import { tracks } from './data/tracks';
 import { RaceAudio } from './game/audio';
+import { applyCampaignResults, campaignLeader, createCampaignScores, type CampaignScore } from './game/campaign';
 import { animateDriverIdle } from './game/models';
 import { createRace, createResults, type RaceControl, type RaceSnapshot } from './game/race';
+import { createReplayRecorder, findReplayFrame, type RaceReplay, type ReplayRecorder } from './game/replay';
 import { buildRaceScene, type SceneBuild } from './game/scene';
 import type { GameMode, GameSettings, GameState, RacerDefinition, RaceResult, TrackDefinition } from './types';
 
@@ -30,12 +32,21 @@ let sceneBuild: SceneBuild | null = null;
 let race: ReturnType<typeof createRace> | null = null;
 let latestSnapshot: RaceSnapshot | null = null;
 let results: RaceResult[] = [];
+let campaignScores: CampaignScore[] = [];
 let captionTimer = 0;
 let captionIndex = 0;
 let lightTimer = 0;
 let lastRadio = '';
 let campaignTrackIndex = 0;
 let uiBound = false;
+let replayRecorder: ReplayRecorder | null = null;
+let lastReplay: RaceReplay | null = null;
+let replayElapsed = 0;
+let menuFlyoverIndex = 0;
+let menuFlyoverTimer = 0;
+let menuPreviewTrack = selectedTrack;
+const frameTimes: number[] = [];
+let frameTimeWindow = 0;
 
 const control: RaceControl = { throttle: false, brake: false, steer: 0 };
 const keys = new Set<string>();
@@ -83,10 +94,12 @@ root.innerHTML = `
 
     <section class="screen" data-screen="podium">
       <div class="panel">
-        <h2>Podium</h2>
+        <h2 id="podiumTitle">Podium</h2>
         <div id="podiumResults"></div>
+        <div id="campaignStandings" class="standings"></div>
         <div class="race-actions">
-          <button class="primary" data-action="nextRace">Next Race</button>
+          <button class="primary" id="nextRaceButton" data-action="nextRace">Next Race</button>
+          <button class="secondary" data-action="playReplay">Replay</button>
           <button class="secondary" data-action="menu">Menu</button>
         </div>
       </div>
@@ -96,6 +109,7 @@ root.innerHTML = `
       <div class="panel">
         <h2>Race Replay</h2>
         <p id="replayText">No full replay saved yet. Run a race to create the highlight camera.</p>
+        <button class="primary" data-action="playReplay">Play Replay</button>
         <button class="primary" data-action="menu">Menu</button>
       </div>
     </section>
@@ -206,6 +220,7 @@ function initUi(): void {
       mode = 'campaign';
       campaignTrackIndex = 0;
       selectedTrack = tracks[0];
+      campaignScores = createCampaignScores(buildRacers());
       showSetup();
     } else if (action === 'timeAttack') {
       mode = 'timeAttack';
@@ -224,15 +239,17 @@ function initUi(): void {
         campaignTrackIndex += 1;
         selectedTrack = tracks[campaignTrackIndex];
         startPreRace();
+      } else if (mode === 'campaign') {
+        showCampaignFinale();
       } else {
-        gameState = 'replay';
-        showScreen('replay');
-        showCaption('Mags Whitlow', fill(dialogue.finale[1][1]));
+        gameState = 'menu';
+        showScreen('menu');
+        loadMenuScene();
       }
     } else if (action === 'replay') {
-      gameState = 'replay';
-      showScreen('replay');
-      showCaption('Arthur Bell', fill(dialogue.replay[0][1]));
+      showReplayScreen();
+    } else if (action === 'playReplay') {
+      startReplayPlayback();
     }
   });
 
@@ -275,28 +292,32 @@ function initUi(): void {
 }
 
 function update(dt: number): void {
+  recordFrameTime(dt);
   if (gameState === 'menu') {
-    updateMenuCamera(dt);
+    updateMenuCamera(dt, true);
     audio.menuMusic(dt);
   } else if (gameState === 'prerace') {
     lightTimer -= dt;
     if (lightTimer <= 0) startRace();
-    updateMenuCamera(dt * 0.7);
+    updateMenuCamera(dt * 0.7, false);
   } else if (gameState === 'race') {
-    updateInputFromKeyboard();
-    latestSnapshot = race?.update(dt, control) ?? null;
+    const activeControl = currentControl();
+    latestSnapshot = race?.update(dt, activeControl) ?? null;
     if (latestSnapshot) {
       updateCars(latestSnapshot);
       updateRaceCamera(latestSnapshot);
       updateHud(latestSnapshot);
       updateRadio(latestSnapshot);
+      replayRecorder?.record(dt, latestSnapshot);
       audio.setEngine(latestSnapshot.player.speed);
       if (latestSnapshot.complete) finishRace(latestSnapshot);
     }
   } else if (gameState === 'podium') {
-    updatePodiumCamera(dt);
+    updatePodiumCamera(dt, false);
   } else if (gameState === 'replay') {
-    updateMenuCamera(dt * 1.2);
+    updateReplayPlayback(dt);
+  } else if (gameState === 'finale') {
+    updatePodiumCamera(dt, true);
   }
 
   captionTimer -= dt;
@@ -321,7 +342,9 @@ function startPreRace(): void {
   controls.classList.remove('active');
   sceneBuild = buildRaceScene(scene, selectedTrack, buildRacers());
   race = createRace(mode, selectedTrack, buildRacers(), settings);
+  replayRecorder = createReplayRecorder(selectedTrack.id, selectedTrack.name, settings.playerName);
   latestSnapshot = race.snapshot();
+  replayRecorder.record(0, latestSnapshot);
   lightTimer = 2.8;
   audio.beep(5);
   showCaption('Arthur Bell', fill(dialogue.prerace[0][1]));
@@ -329,14 +352,22 @@ function startPreRace(): void {
 
 function startRace(): void {
   gameState = 'race';
+  resetFrameStats();
   hud.classList.add('active');
   controls.classList.add('active');
   control.brake = false;
+  control.throttle = false;
+  control.steer = 0;
   showCaption('Mags Whitlow', fill(dialogue.lights[1][1]));
 }
 
 function finishRace(snapshot: RaceSnapshot): void {
   results = createResults(snapshot);
+  lastReplay = replayRecorder?.finalize(results) ?? lastReplay;
+  replayRecorder = null;
+  if (mode === 'campaign') {
+    campaignScores = applyCampaignResults(campaignScores.length ? campaignScores : createCampaignScores(buildRacers()), results);
+  }
   gameState = 'podium';
   audio.stopEngine();
   controls.classList.remove('active');
@@ -351,16 +382,29 @@ function buildRacers(): RacerDefinition[] {
 }
 
 function loadMenuScene(): void {
-  sceneBuild = buildRaceScene(scene, selectedTrack, buildRacers());
+  menuPreviewTrack = selectedTrack;
+  menuFlyoverIndex = tracks.findIndex((track) => track.id === selectedTrack.id);
+  menuFlyoverTimer = 7;
+  sceneBuild = buildRaceScene(scene, menuPreviewTrack, buildRacers());
   race = null;
   latestSnapshot = null;
   hud.classList.remove('active');
   controls.classList.remove('active');
 }
 
-function updateMenuCamera(dt: number): void {
+function updateMenuCamera(dt: number, cycleTracks: boolean): void {
   if (!sceneBuild) return;
   captionTimer -= dt;
+  if (cycleTracks) {
+    menuFlyoverTimer -= dt;
+    if (menuFlyoverTimer <= 0) {
+      menuFlyoverIndex = (menuFlyoverIndex + 1) % tracks.length;
+      menuPreviewTrack = tracks[menuFlyoverIndex];
+      sceneBuild = buildRaceScene(scene, menuPreviewTrack, buildRacers());
+      menuFlyoverTimer = 7;
+      showCaption('Arthur Bell', `Track preview: ${menuPreviewTrack.name}.`);
+    }
+  }
   const t = (performance.now() * 0.000035) % 1;
   const pose = sceneBuild.path.poseAt(t, 76);
   const look = sceneBuild.path.poseAt(t + 0.025, 0).position;
@@ -377,16 +421,17 @@ function updateRaceCamera(snapshot: RaceSnapshot): void {
   camera.lookAt(pose.position.x, 1.5, pose.position.z);
 }
 
-function updatePodiumCamera(dt: number): void {
+function updatePodiumCamera(dt: number, finale: boolean): void {
   if (!sceneBuild || !results[0]) return;
-  const winner = sceneBuild.cars.get(results[0].racerId);
+  const targetId = finale ? campaignLeader(campaignScores)?.racerId ?? results[0].racerId : results[0].racerId;
+  const winner = sceneBuild.cars.get(targetId);
   const elapsed = performance.now() * 0.001;
-  const radius = 12;
+  const radius = finale ? 18 : 12;
   const target = winner?.position ?? new THREE.Vector3();
-  camera.position.set(target.x + Math.cos(elapsed * 0.45) * radius, 7, target.z + Math.sin(elapsed * 0.45) * radius);
+  camera.position.set(target.x + Math.cos(elapsed * 0.45) * radius, finale ? 10 : 7, target.z + Math.sin(elapsed * 0.45) * radius);
   camera.lookAt(target.x, 1.5, target.z);
-  if (winner) animateDriverIdle(winner, elapsed, true);
-  for (const car of sceneBuild.cars.values()) animateDriverIdle(car, elapsed, car === winner);
+  if (winner) animateDriverIdle(winner, elapsed, true, finale);
+  for (const car of sceneBuild.cars.values()) animateDriverIdle(car, elapsed, car === winner, finale);
   void dt;
 }
 
@@ -449,19 +494,106 @@ function showCaption(name: string, text: string): void {
 
 function renderPodium(): void {
   const podium = root.querySelector<HTMLDivElement>('#podiumResults')!;
+  root.querySelector<HTMLHeadingElement>('#podiumTitle')!.textContent = mode === 'campaign' ? `${selectedTrack.name} Podium` : 'Podium';
   podium.innerHTML = results
     .slice(0, 3)
     .map((result, index) => `<p><strong>${index + 1}. ${result.name}</strong> / ${formatTime(result.totalTime)} / Best ${formatTime(result.bestLap)}</p>`)
     .join('');
+  renderCampaignStandings();
+  const nextButton = root.querySelector<HTMLButtonElement>('#nextRaceButton')!;
+  nextButton.textContent = mode === 'campaign' && campaignTrackIndex < tracks.length - 1 ? 'Next Race' : mode === 'campaign' ? 'Finale' : 'Done';
 }
 
-function updateInputFromKeyboard(): void {
-  if (keys.has('arrowleft') || keys.has('a')) control.steer = -1;
-  else if (keys.has('arrowright') || keys.has('d')) control.steer = 1;
-  else if (!controls.matches(':active')) control.steer = 0;
+function renderCampaignStandings(): void {
+  const standings = root.querySelector<HTMLDivElement>('#campaignStandings')!;
+  if (mode !== 'campaign' || campaignScores.length === 0) {
+    standings.innerHTML = '';
+    return;
+  }
+  standings.innerHTML = `
+    <h3>Campaign Standings</h3>
+    <ol>${campaignScores
+      .slice(0, 5)
+      .map((score) => `<li>${score.name} / ${score.points} pts / ${score.wins} wins</li>`)
+      .join('')}</ol>
+  `;
+}
 
-  control.throttle = control.throttle || keys.has('arrowup') || keys.has('w') || keys.has(' ');
-  control.brake = control.brake || keys.has('arrowdown') || keys.has('s');
+function showCampaignFinale(): void {
+  const champion = campaignLeader(campaignScores);
+  gameState = 'finale';
+  showScreen('podium');
+  root.querySelector<HTMLHeadingElement>('#podiumTitle')!.textContent = 'Campaign Champions';
+  root.querySelector<HTMLDivElement>('#podiumResults')!.innerHTML = campaignScores
+    .slice(0, 3)
+    .map((score, index) => `<p><strong>${index + 1}. ${score.name}</strong> / ${score.points} pts / ${score.wins} wins</p>`)
+    .join('');
+  renderCampaignStandings();
+  root.querySelector<HTMLButtonElement>('#nextRaceButton')!.textContent = 'Done';
+  showCaption('Mags Whitlow', fill(dialogue.finale[1][1]));
+  if (champion) showCaption('Arthur Bell', `${champion.name} is champion after ${tracks.length} races.`);
+}
+
+function showReplayScreen(): void {
+  gameState = 'replay';
+  showScreen('replay');
+  root.querySelector<HTMLParagraphElement>('#replayText')!.textContent = lastReplay
+    ? `${lastReplay.trackName} replay: ${lastReplay.frames.length} frames, about ${Math.ceil(lastReplay.estimatedBytes / 1024)} KB.`
+    : 'No full replay saved yet. Run a race to create the highlight camera.';
+  showCaption('Arthur Bell', fill(dialogue.replay[0][1]));
+  if (lastReplay) startReplayPlayback();
+}
+
+function startReplayPlayback(): void {
+  if (!lastReplay) {
+    showReplayScreen();
+    return;
+  }
+  const track = tracks.find((item) => item.id === lastReplay?.trackId) ?? selectedTrack;
+  selectedTrack = track;
+  sceneBuild = buildRaceScene(scene, track, buildRacers());
+  replayElapsed = 0;
+  gameState = 'replay';
+  showScreen(null);
+  hud.classList.remove('active');
+  controls.classList.remove('active');
+  showCaption('Arthur Bell', fill(dialogue.replay[0][1]));
+}
+
+function updateReplayPlayback(dt: number): void {
+  if (!lastReplay || !sceneBuild) {
+    updateMenuCamera(dt * 1.2, false);
+    return;
+  }
+  replayElapsed += dt;
+  const frame = findReplayFrame(lastReplay, replayElapsed);
+  if (!frame) return;
+  for (const racer of frame.racers) {
+    const car = sceneBuild.cars.get(racer.id);
+    if (!car) continue;
+    const pose = sceneBuild.path.poseAt(racer.progress, racer.lateral);
+    car.position.copy(pose.position);
+    car.position.y = 0.2;
+    car.rotation.y = pose.yaw - racer.lateral * 0.015;
+    animateDriverIdle(car, performance.now() * 0.001);
+  }
+  const focus = frame.racers[0];
+  const pose = sceneBuild.path.poseAt(focus.progress, focus.lateral);
+  const side = pose.normal.clone().multiplyScalar(16 * Math.sin(replayElapsed * 0.6));
+  const back = pose.tangent.clone().multiplyScalar(-18);
+  camera.position.lerp(pose.position.clone().add(side).add(back).add(new THREE.Vector3(0, 9, 0)), 0.08);
+  camera.lookAt(pose.position.x, 1.5, pose.position.z);
+}
+
+function currentControl(): RaceControl {
+  const keyboardThrottle = keys.has('arrowup') || keys.has('w') || keys.has(' ');
+  const keyboardBrake = keys.has('arrowdown') || keys.has('s');
+  const keyboardSteer = keys.has('arrowleft') || keys.has('a') ? -1 : keys.has('arrowright') || keys.has('d') ? 1 : 0;
+  return {
+    throttle: control.throttle || keyboardThrottle,
+    brake: control.brake || keyboardBrake,
+    steer: keyboardSteer || control.steer,
+  };
 }
 
 function bindHold(selector: string, onDown: () => void, onUp: () => void): void {
@@ -512,15 +644,35 @@ function resize(): void {
 }
 
 function exposeDebug(): void {
+  const sortedFrameTimes = [...frameTimes].sort((a, b) => a - b);
+  const p50 = percentile(sortedFrameTimes, 0.5);
+  const p95 = percentile(sortedFrameTimes, 0.95);
+  const worst = sortedFrameTimes[sortedFrameTimes.length - 1] ?? 0;
+  const fps = p50 > 0 ? 1 / p50 : 0;
   const metrics = {
     calls: renderer.info.render.calls,
     triangles: renderer.info.render.triangles,
+    points: renderer.info.render.points,
+    lines: renderer.info.render.lines,
     geometries: renderer.info.memory.geometries,
     textures: renderer.info.memory.textures,
+    p50FrameMs: Math.round(p50 * 1000 * 10) / 10,
+    p95FrameMs: Math.round(p95 * 1000 * 10) / 10,
+    worstFrameMs: Math.round(worst * 1000 * 10) / 10,
+    estimatedFps: Math.round(fps),
+    pixelRatio: renderer.getPixelRatio(),
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    performanceMode: settings.performanceMode,
     state: gameState,
     track: selectedTrack.id,
+    previewTrack: menuPreviewTrack.id,
+    replayFrames: lastReplay?.frames.length ?? 0,
+    replayBytes: lastReplay?.estimatedBytes ?? 0,
+    replayDroppedSamples: lastReplay?.droppedSamples ?? 0,
+    replaySampleRate: lastReplay?.sampleRate ?? 0,
+    campaignLeader: campaignLeader(campaignScores)?.name ?? null,
   };
-  debug.textContent = `calls ${metrics.calls}\ntris ${metrics.triangles}\ngeos ${metrics.geometries}\ntex ${metrics.textures}`;
+  debug.textContent = `calls ${metrics.calls}\ntris ${metrics.triangles}\ngeos ${metrics.geometries}\ntex ${metrics.textures}\nfps ${metrics.estimatedFps}\nreplay ${metrics.replayFrames}`;
   debug.classList.toggle('active', settings.performanceMode === 'highDetail');
   (window as any).__GRIDLINE_APEX__ = {
     ready: true,
@@ -528,7 +680,28 @@ function exposeDebug(): void {
     metrics,
     settings,
     results,
+    campaignScores,
+    replay: lastReplay,
   };
+}
+
+function recordFrameTime(dt: number): void {
+  frameTimes.push(dt);
+  frameTimeWindow += dt;
+  while (frameTimeWindow > 5 && frameTimes.length > 1) {
+    frameTimeWindow -= frameTimes.shift() ?? 0;
+  }
+}
+
+function percentile(sortedValues: number[], fraction: number): number {
+  if (sortedValues.length === 0) return 0;
+  const index = Math.min(sortedValues.length - 1, Math.max(0, Math.floor((sortedValues.length - 1) * fraction)));
+  return sortedValues[index];
+}
+
+function resetFrameStats(): void {
+  frameTimes.length = 0;
+  frameTimeWindow = 0;
 }
 
 function fill(text: string): string {

@@ -285,6 +285,19 @@ p {
   font-size: 0.8rem;
 }
 
+.standings {
+  margin-top: 14px;
+}
+
+.standings h3 {
+  margin: 0 0 8px;
+}
+
+.standings ol {
+  margin: 0;
+  padding-left: 24px;
+}
+
 .caption {
   position: absolute;
   left: max(12px, env(safe-area-inset-left));
@@ -305,7 +318,9 @@ p {
   display: block;
 }
 
-.screen.active ~ .caption {
+.screen[data-screen="menu"].active ~ .caption,
+.screen[data-screen="settings"].active ~ .caption,
+.screen[data-screen="replay"].active ~ .caption {
   display: none;
 }
 

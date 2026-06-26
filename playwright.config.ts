@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests',
   timeout: 45_000,
+  workers: 1,
   webServer: {
     command: 'npm run dev -- --port 4179',
     url: 'http://127.0.0.1:4179/formula-js/',

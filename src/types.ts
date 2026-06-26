@@ -1,5 +1,5 @@
 export type GameMode = 'campaign' | 'timeAttack';
-export type GameState = 'menu' | 'setup' | 'prerace' | 'race' | 'podium' | 'replay';
+export type GameState = 'menu' | 'setup' | 'prerace' | 'race' | 'podium' | 'replay' | 'finale';
 export type ControlMode = 'holdToGo' | 'splitPedals';
 export type PerformanceMode = 'balanced' | 'highDetail' | 'battery';
 

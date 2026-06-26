@@ -73,13 +73,14 @@ export function createFormulaCar(color: number, helmet: number): THREE.Group {
   return group;
 }
 
-export function animateDriverIdle(car: THREE.Group, elapsed: number, celebration = false): void {
+export function animateDriverIdle(car: THREE.Group, elapsed: number, celebration = false, finale = false): void {
   const driver = car.getObjectByName('customizable-driver');
   if (!driver) return;
   if (celebration) {
-    driver.rotation.z = Math.sin(elapsed * 8) * 0.22;
-    driver.rotation.x = Math.sin(elapsed * 4) * 0.08;
-    driver.position.y = Math.abs(Math.sin(elapsed * 5)) * 0.12;
+    const energy = finale ? 1.55 : 1;
+    driver.rotation.z = Math.sin(elapsed * 8) * 0.22 * energy;
+    driver.rotation.x = Math.sin(elapsed * 4) * 0.08 * energy;
+    driver.position.y = Math.abs(Math.sin(elapsed * (finale ? 7 : 5))) * 0.12 * energy;
     return;
   }
   driver.rotation.z = Math.sin(elapsed * 1.5) * 0.025;

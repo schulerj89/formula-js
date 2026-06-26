@@ -11,6 +11,7 @@ export interface SceneBuild {
 const roadWidth = 11;
 
 export function buildRaceScene(scene: THREE.Scene, track: TrackDefinition, racers: RacerDefinition[]): SceneBuild {
+  disposeScene(scene);
   scene.clear();
   scene.background = new THREE.Color(track.palette.sky);
   scene.fog = new THREE.Fog(track.palette.sky, 160, 520);
@@ -40,6 +41,21 @@ export function buildRaceScene(scene: THREE.Scene, track: TrackDefinition, racer
   });
 
   return { path, cars };
+}
+
+function disposeScene(scene: THREE.Scene): void {
+  scene.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    if ('geometry' in mesh && mesh.geometry) {
+      mesh.geometry.dispose();
+    }
+    const material = mesh.material as THREE.Material | THREE.Material[] | undefined;
+    if (Array.isArray(material)) {
+      material.forEach((item) => item.dispose());
+    } else {
+      material?.dispose();
+    }
+  });
 }
 
 function createGround(track: TrackDefinition): THREE.Mesh {
@@ -92,21 +108,35 @@ function createKerbs(path: TrackPath, track: TrackDefinition): THREE.Group {
   const red = new THREE.MeshLambertMaterial({ color: 0xd62828 });
   const white = new THREE.MeshLambertMaterial({ color: 0xf8f9fa });
   const geometry = new THREE.BoxGeometry(1.8, 0.12, 0.72, 1, 1, 1);
+  const redMatrices: THREE.Matrix4[] = [];
+  const whiteMatrices: THREE.Matrix4[] = [];
+  const rotation = new THREE.Quaternion();
+  const scale = new THREE.Vector3(1, 1, 1);
 
   for (const [start, end] of track.kerbZones) {
     for (let p = start; p < end; p += 0.006) {
       const pose = path.poseAt(p);
-      const material = Math.floor((p - start) / 0.012) % 2 === 0 ? red : white;
       for (const side of [-1, 1]) {
-        const kerb = new THREE.Mesh(geometry, material);
-        kerb.position.copy(pose.position).addScaledVector(pose.normal, side * (roadWidth / 2 + 0.34));
-        kerb.position.y = 0.1;
-        kerb.rotation.y = pose.yaw;
-        group.add(kerb);
+        const matrix = new THREE.Matrix4();
+        rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw);
+        const position = pose.position.clone().addScaledVector(pose.normal, side * (roadWidth / 2 + 0.34));
+        position.y = 0.1;
+        matrix.compose(position, rotation, scale);
+        if (Math.floor((p - start) / 0.012) % 2 === 0) redMatrices.push(matrix);
+        else whiteMatrices.push(matrix);
       }
     }
   }
 
+  const redKerbs = new THREE.InstancedMesh(geometry, red, Math.max(1, redMatrices.length));
+  const whiteKerbs = new THREE.InstancedMesh(geometry, white, Math.max(1, whiteMatrices.length));
+  redMatrices.forEach((matrix, index) => redKerbs.setMatrixAt(index, matrix));
+  whiteMatrices.forEach((matrix, index) => whiteKerbs.setMatrixAt(index, matrix));
+  redKerbs.count = redMatrices.length;
+  whiteKerbs.count = whiteMatrices.length;
+  redKerbs.instanceMatrix.needsUpdate = true;
+  whiteKerbs.instanceMatrix.needsUpdate = true;
+  group.add(redKerbs, whiteKerbs);
   return group;
 }
 

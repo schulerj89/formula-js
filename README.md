@@ -13,6 +13,8 @@ Mobile-first Three.js formula racing game.
 
 - Title menu with track flyover camera.
 - Campaign, time attack, settings, replay, and podium flow.
+- Campaign standings with a finale podium and winner celebration camera.
+- Bounded end-of-race replay playback from compact race-state samples.
 - Four procedural race circuits with red/white kerbs, trees, buildings, and landmarks.
 - Player plus seven CPU drivers with static names.
 - Press-to-go or split brake/go mobile controls.
