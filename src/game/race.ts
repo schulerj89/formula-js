@@ -1,4 +1,12 @@
 import type { GameMode, GameSettings, RacerDefinition, RaceResult, TrackDefinition } from '../types';
+import {
+  BASE_GUARDRAIL_BOUNDARY,
+  OFF_TRACK_SLOWDOWN_START,
+  createTrackCollisionProfile,
+  resolveTrackSpaceCollision,
+  type TrackCollisionKind,
+  type TrackCollisionProfile,
+} from './trackSpace';
 
 export interface RacerState {
   definition: RacerDefinition;
@@ -20,6 +28,11 @@ export interface RacerState {
   lastContactSeverity: number;
   maxContactSeverity: number;
   lastContactRacerId: string | null;
+  trackContactCooldown: number;
+  trackContactEvents: number;
+  lastTrackContactKind: TrackCollisionKind | null;
+  lastTrackContactSide: -1 | 1 | null;
+  lastTrackContactSeverity: number;
   handling: PlayerHandling;
 }
 
@@ -46,8 +59,7 @@ export interface RaceControl {
   steer: number;
 }
 
-export const TRACK_EDGE_BOUNDARY = 5.35;
-const OFF_TRACK_SLOWDOWN_START = 4.8;
+export const TRACK_EDGE_BOUNDARY = BASE_GUARDRAIL_BOUNDARY;
 
 export interface RaceSnapshot {
   racers: RacerState[];
@@ -64,6 +76,7 @@ export function createRace(
   settings: GameSettings,
 ): { update: (dt: number, control: RaceControl) => RaceSnapshot; snapshot: () => RaceSnapshot } {
   const laps = mode === 'timeAttack' ? 1 : track.laps;
+  const collisionProfile = createTrackCollisionProfile(track);
   const states: RacerState[] = racers.map((definition, index) => ({
     definition,
     progress: 0.985 - index * 0.006,
@@ -84,6 +97,11 @@ export function createRace(
     lastContactSeverity: 0,
     maxContactSeverity: 0,
     lastContactRacerId: null,
+    trackContactCooldown: 0,
+    trackContactEvents: 0,
+    lastTrackContactKind: null,
+    lastTrackContactSide: null,
+    lastTrackContactSeverity: 0,
     handling: defaultPlayerHandling(),
   }));
   const player = states[0];
@@ -95,14 +113,16 @@ export function createRace(
       state.totalTime += dt;
       state.currentLapTime += dt;
       state.contactCooldown = Math.max(0, state.contactCooldown - dt);
+      state.trackContactCooldown = Math.max(0, state.trackContactCooldown - dt);
       state.lastContactSeverity = Math.max(0, state.lastContactSeverity - dt * 1.4);
+      state.lastTrackContactSeverity = Math.max(0, state.lastTrackContactSeverity - dt * 1.4);
 
       if (i === 0) {
         updatePlayer(state, control, dt, settings, track);
       } else {
         updateCpu(state, i, dt, track, states);
       }
-      applyTrackBoundaryResponse(state, dt, settings, i === 0 ? 1 : 0.65);
+      applyTrackSpaceCollisionResponse(state, dt, settings, collisionProfile, i === 0 ? 1 : 0.65);
 
       const lapDistance = Math.max(0, state.speed * dt / (track.lengthKm * 1000));
       const previousLap = Math.floor(state.distance);
@@ -121,7 +141,7 @@ export function createRace(
       }
     }
     applyCarContacts(states, track, settings);
-    for (const state of states) applyTrackBoundaryResponse(state, dt, settings, 0.45);
+    for (const state of states) applyTrackSpaceCollisionResponse(state, dt, settings, collisionProfile, 0.45);
 
     return snapshot();
   };
@@ -175,16 +195,27 @@ function updatePlayer(state: RacerState, control: RaceControl, dt: number, setti
   state.speed = Math.min(state.speed, conditionLimit);
 }
 
-function applyTrackBoundaryResponse(state: RacerState, dt: number, settings: GameSettings, severityScale: number): void {
-  const boundaryExcess = Math.abs(state.lateral) - TRACK_EDGE_BOUNDARY;
-  if (boundaryExcess <= 0) return;
-  const side = Math.sign(state.lateral) || 1;
-  const severity = clamp(boundaryExcess / 1.25 + state.speed / 150, 0.1, 1) * severityScale;
-  state.lateral = side * TRACK_EDGE_BOUNDARY;
-  state.speed *= 1 - Math.min(0.72, 0.32 + severity * 0.36);
-  state.lastContactSeverity = Math.max(state.lastContactSeverity, Math.round(severity * 1000) / 1000);
-  state.maxContactSeverity = Math.max(state.maxContactSeverity, state.lastContactSeverity);
-  if (settings.realisticDamage) state.damage = Math.max(0, state.damage - severity * dt * 0.12);
+function applyTrackSpaceCollisionResponse(
+  state: RacerState,
+  dt: number,
+  settings: GameSettings,
+  collisionProfile: TrackCollisionProfile,
+  severityScale: number,
+): void {
+  const collision = resolveTrackSpaceCollision(collisionProfile, state.progress, state.lateral, state.speed);
+  if (!collision) return;
+  const severity = Math.round(collision.severity * severityScale * 1000) / 1000;
+  state.lateral = collision.side * collision.boundary;
+  state.speed *= 1 - Math.min(0.8, collision.speedLoss + severity * 0.24);
+  state.lastTrackContactKind = collision.kind;
+  state.lastTrackContactSide = collision.side;
+  state.lastTrackContactSeverity = Math.max(state.lastTrackContactSeverity, severity);
+  if (state.trackContactCooldown <= 0) {
+    state.trackContactEvents += 1;
+    state.trackContactCooldown = 0.42;
+  }
+  if (settings.realisticDamage) state.damage = Math.max(0, state.damage - severity * dt * collision.damageScale);
+  if (settings.realisticTires) state.tires = Math.max(0, state.tires - severity * dt * collision.tireScale);
 }
 
 export function analyzePlayerHandling(

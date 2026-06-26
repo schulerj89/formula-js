@@ -16,6 +16,7 @@ import { applyCampaignResults, createCampaignObjective, createCampaignScores, ev
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
 import { buildRaceScene, createPodiumCeremony, DRIVABLE_HALF_WIDTH, validateTrackEnvironment, type EnvironmentCategory, type SceneDetailLevel } from '../src/game/scene';
 import { TrackPath } from '../src/game/trackPath';
+import { PIT_WALL_BOUNDARY, createTrackCollisionProfile, resolveTrackSpaceCollision } from '../src/game/trackSpace';
 import { animateDriverIdle, createFormulaCar, summarizeDriverRig } from '../src/game/models';
 import { createFormulaAssetManager } from '../src/game/formulaAssets';
 import { createFinaleCommentary, createRacePodiumCommentary } from '../src/game/podiumCommentary';
@@ -225,6 +226,24 @@ describe('track data', () => {
       category: 'track_curb',
       radius: curbRadius,
     });
+  });
+
+  it('builds side-aware track-space collision zones from circuit infrastructure', () => {
+    const marina = tracks.find((track) => track.id === 'marina')!;
+    const profile = createTrackCollisionProfile(marina);
+    const pitWall = resolveTrackSpaceCollision(profile, 0.92, PIT_WALL_BOUNDARY + 0.5, 52);
+    const clearOppositeSide = resolveTrackSpaceCollision(profile, 0.92, -(TRACK_EDGE_BOUNDARY + 0.2), 52);
+    const apexMarker = resolveTrackSpaceCollision(profile, 0.16, DRIVABLE_HALF_WIDTH + 0.8, 48);
+
+    expect(profile.zones.some((zone) => zone.kind === 'guardrail')).toBe(true);
+    expect(profile.zones.some((zone) => zone.kind === 'pit_wall')).toBe(true);
+    expect(pitWall).toMatchObject({
+      kind: 'pit_wall',
+      side: 1,
+      boundary: PIT_WALL_BOUNDARY,
+    });
+    expect(clearOppositeSide?.kind).toBe('guardrail');
+    expect(apexMarker?.kind).toBe('apex_marker');
   });
 
   it('retains shared procedural car geometries while disposing scene-owned resources on rebuild', () => {
@@ -734,7 +753,7 @@ describe('race simulation', () => {
     expect(snapshot.player.finished).toBe(false);
   });
 
-  it('clamps and slows cars that exceed the hard track-edge boundary', () => {
+  it('clamps and slows cars that hit the track-space guardrail boundary', () => {
     const racers = [{ ...playerTemplate, name: settings.playerName }];
     const race = createRace('timeAttack', tracks[0], racers, settings);
     const initial = race.snapshot();
@@ -747,7 +766,29 @@ describe('race simulation', () => {
     expect(Math.abs(snapshot.player.lateral)).toBeLessThanOrEqual(TRACK_EDGE_BOUNDARY);
     expect(snapshot.player.speed).toBeLessThan(64);
     expect(snapshot.player.damage).toBeLessThan(1);
-    expect(snapshot.player.maxContactSeverity).toBeGreaterThan(0);
+    expect(snapshot.player.trackContactEvents).toBe(1);
+    expect(snapshot.player.lastTrackContactKind).toBe('guardrail');
+    expect(snapshot.player.lastTrackContactSeverity).toBeGreaterThan(0);
+    expect(snapshot.player.contactEvents).toBe(0);
+  });
+
+  it('uses Marina pit-wall track-space collision before the general guardrail limit', () => {
+    const marina = tracks.find((track) => track.id === 'marina')!;
+    const racers = [{ ...playerTemplate, name: settings.playerName }];
+    const race = createRace('timeAttack', marina, racers, settings);
+    const initial = race.snapshot();
+    initial.player.progress = 0.92;
+    initial.player.lateral = PIT_WALL_BOUNDARY + 0.75;
+    initial.player.speed = 58;
+    initial.player.damage = 1;
+
+    const snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: 1 });
+
+    expect(snapshot.player.lateral).toBeLessThanOrEqual(PIT_WALL_BOUNDARY);
+    expect(snapshot.player.lastTrackContactKind).toBe('pit_wall');
+    expect(snapshot.player.trackContactEvents).toBe(1);
+    expect(snapshot.player.speed).toBeLessThan(58);
+    expect(snapshot.player.damage).toBeLessThan(1);
   });
 
   it('requires a plausible driven lap before completing time attack', () => {

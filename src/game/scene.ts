@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import type { RacerDefinition, TrackDefinition } from '../types';
 import { createFormulaCar } from './models';
 import { TrackPath } from './trackPath';
+import { DRIVABLE_HALF_WIDTH, PROTECTED_ROAD_HALF_WIDTH, ROAD_WIDTH } from './trackSpace';
+export { DRIVABLE_HALF_WIDTH, PROTECTED_ROAD_HALF_WIDTH, ROAD_WIDTH } from './trackSpace';
 
 export interface SceneBuild {
   path: TrackPath;
@@ -108,9 +110,6 @@ export interface PodiumCeremonyStats {
   finaleMode: boolean;
 }
 
-export const ROAD_WIDTH = 11;
-export const DRIVABLE_HALF_WIDTH = ROAD_WIDTH / 2;
-export const PROTECTED_ROAD_HALF_WIDTH = DRIVABLE_HALF_WIDTH + 0.35;
 const MAX_CURB_ROAD_INTRUSION = 0.25;
 const VALIDATION_SEGMENTS = 512;
 const marinaTrackId = 'marina';

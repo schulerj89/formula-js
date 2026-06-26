@@ -1709,6 +1709,14 @@ function buildDebugMetrics() {
       totalEvents: latestSnapshot ? latestSnapshot.racers.reduce((total, racer) => total + racer.contactEvents, 0) : 0,
       maxSeverity: latestSnapshot ? Math.max(0, ...latestSnapshot.racers.map((racer) => racer.maxContactSeverity)) : 0,
     },
+    trackContact: {
+      playerEvents: latestSnapshot?.player.trackContactEvents ?? 0,
+      playerLastKind: latestSnapshot?.player.lastTrackContactKind ?? null,
+      playerLastSide: latestSnapshot?.player.lastTrackContactSide ?? null,
+      playerLastSeverity: latestSnapshot?.player.lastTrackContactSeverity ?? 0,
+      totalEvents: latestSnapshot ? latestSnapshot.racers.reduce((total, racer) => total + racer.trackContactEvents, 0) : 0,
+      maxSeverity: latestSnapshot ? Math.max(0, ...latestSnapshot.racers.map((racer) => racer.lastTrackContactSeverity)) : 0,
+    },
     raceCommentary: {
       callouts: raceCommentaryCallouts,
       spotterCallouts,
