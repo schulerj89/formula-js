@@ -32,6 +32,7 @@ Mobile-first Three.js formula racing game.
 - Press-to-go or split brake/go mobile controls.
 - Damage, tire wear, race radio, leaderboard toggle, standings, and performance overlay.
 - Live track map with player/rival dots plus nearest ahead/behind race gaps.
+- Compact race guidance for closing traffic, side threats, and upcoming braking zones.
 - Real driven-lap progression for time attack and campaign races.
 - CPU racers with corner braking, racing-line targets, traffic gaps, and overtaking lanes.
 - Procedural car fallback in battery/balanced modes, with generated GLB cars enabled in high-detail mode when all kit pieces load.

@@ -268,7 +268,7 @@ describe('race simulation', () => {
     for (let i = 0; i < 180; i += 1) {
       snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: 0.1 });
     }
-    const summary = summarizeRaceReadability(snapshot, tracks[0].lengthKm);
+    const summary = summarizeRaceReadability(snapshot, tracks[0]);
     expect(summary.totalRacers).toBe(8);
     expect(summary.position).toBe(snapshot.position);
     expect(summary.nearestAhead?.meters ?? 0).toBeGreaterThanOrEqual(0);
@@ -276,6 +276,39 @@ describe('race simulation', () => {
     expect([summary.nearestAhead?.shortName, summary.nearestBehind?.shortName].filter(Boolean).length).toBeGreaterThan(0);
     expect(summary.nearestAhead?.racerId).not.toBe('player');
     expect(summary.nearestBehind?.racerId).not.toBe('player');
+    expect(summary.nextBrakeMeters).toBeGreaterThanOrEqual(0);
+    expect(['clear', 'soon', 'now']).toContain(summary.brakeUrgency);
+  });
+
+  it('reports closing traffic, side-by-side rivals, and urgent braking guidance', () => {
+    const racers = [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers];
+    const race = createRace('timeAttack', tracks[0], racers, settings);
+    const snapshot = race.snapshot();
+    snapshot.player.distance = 0.06;
+    snapshot.player.progress = 0.06;
+    snapshot.player.speed = 62;
+    snapshot.player.lateral = 0.2;
+    snapshot.racers[1].distance = 0.067;
+    snapshot.racers[1].progress = 0.067;
+    snapshot.racers[1].speed = 48;
+    snapshot.racers[1].lateral = -1.2;
+    snapshot.racers[2].distance = 0.058;
+    snapshot.racers[2].progress = 0.058;
+    snapshot.racers[2].speed = 68;
+    snapshot.racers[2].lateral = 1.6;
+    const standings = [...snapshot.racers].sort((a, b) => b.distance - a.distance);
+    const crafted = { ...snapshot, standings, position: standings.findIndex((racer) => racer.definition.id === 'player') + 1 };
+
+    const summary = summarizeRaceReadability(crafted, tracks[0]);
+
+    expect(summary.nearestAhead?.racerId).toBe('cpu-1');
+    expect(summary.nearestAhead?.closing).toBe(true);
+    expect(summary.nearestBehind?.racerId).toBe('cpu-2');
+    expect(summary.nearestBehind?.closing).toBe(true);
+    expect(summary.sideBySide?.racerId).toBe('cpu-2');
+    expect(summary.sideBySide?.side).toBe('right');
+    expect(summary.nextBrakeMeters).toBeLessThan(60);
+    expect(summary.brakeUrgency).toBe('now');
   });
 
   it('gives CPU racers corner braking and overtake intent', () => {

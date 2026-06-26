@@ -32,6 +32,13 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await page.keyboard.up('Space');
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'race');
   await expect(page.locator('#lap')).toHaveText('1/1');
+  await expect(page.locator('#raceHint')).toBeVisible();
+  const viewport = page.viewportSize();
+  if (viewport && viewport.width <= 640) {
+    await expect(page.locator('#leaderboard')).toBeHidden();
+  } else {
+    await expect(page.locator('#leaderboard')).toBeVisible();
+  }
   await page.screenshot({ path: testInfo.outputPath('race-start.png'), fullPage: true });
 
   const metrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
@@ -61,6 +68,10 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.raceReadability.trackMapDots).toBe(8);
   expect(metrics.raceReadability.nearestAheadMeters ?? 0).toBeGreaterThanOrEqual(0);
   expect(metrics.raceReadability.nearestBehindMeters ?? 0).toBeGreaterThanOrEqual(0);
+  expect(metrics.raceReadability.nextBrakeMeters ?? 0).toBeGreaterThanOrEqual(0);
+  expect(['clear', 'soon', 'now']).toContain(metrics.raceReadability.brakeUrgency);
+  expect(typeof metrics.raceReadability.closingAhead).toBe('boolean');
+  expect(typeof metrics.raceReadability.closingBehind).toBe('boolean');
   expect(metrics.cpuRacecraft.targetSpeedMax).toBeGreaterThan(40);
   expect(metrics.cpuRacecraft.maxCornerLoad).toBeGreaterThanOrEqual(0);
   expect(metrics.cpuRacecraft.overtakeCount).toBeGreaterThanOrEqual(0);

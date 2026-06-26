@@ -387,6 +387,18 @@ p {
   white-space: nowrap;
 }
 
+.gap-strip span.soon {
+  color: #f7c948;
+  border-color: rgb(247 201 72 / 32%);
+}
+
+.gap-strip span.now,
+.gap-strip span.danger {
+  color: #ffe8e8;
+  background: rgb(128 24 30 / 72%);
+  border-color: rgb(255 107 107 / 42%);
+}
+
 .leaderboard {
   grid-column: 2;
   display: none;
@@ -552,6 +564,12 @@ p {
 
 .debug.active {
   display: block;
+}
+
+@media (max-width: 640px) {
+  .leaderboard.active {
+    display: none;
+  }
 }
 
 @media (min-width: 760px) {

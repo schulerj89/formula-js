@@ -67,6 +67,11 @@ let trackMapLayout: TrackMapLayout | null = null;
 let trackMapDotCount = 0;
 let nearestAheadMeters: number | null = null;
 let nearestBehindMeters: number | null = null;
+let readoutClosingAhead = false;
+let readoutClosingBehind = false;
+let readoutSideBySide: string | null = null;
+let nextBrakeMeters: number | null = null;
+let brakeUrgency: 'clear' | 'soon' | 'now' = 'clear';
 const frameTimes: number[] = [];
 let frameTimeWindow = 0;
 const roadParkingBase = 17;
@@ -177,6 +182,7 @@ root.innerHTML = `
         <div class="gap-strip">
           <span id="gapAhead">Up --</span>
           <span id="gapBehind">Back --</span>
+          <span id="raceHint">Brake --</span>
         </div>
       </div>
       <aside class="leaderboard" id="leaderboard"><ol></ol></aside>
@@ -229,6 +235,7 @@ const trackMapRoute = root.querySelector<SVGPolylineElement>('#trackMapRoute')!;
 const trackMapDots = root.querySelector<SVGGElement>('#trackMapDots')!;
 const gapAhead = root.querySelector<HTMLElement>('#gapAhead')!;
 const gapBehind = root.querySelector<HTMLElement>('#gapBehind')!;
+const raceHint = root.querySelector<HTMLElement>('#raceHint')!;
 const trackMapDotElements = new Map<string, SVGCircleElement>();
 
 initUi();
@@ -585,7 +592,7 @@ function updateHud(snapshot: RaceSnapshot): void {
   updateTrackMap(snapshot);
   leaderboard.classList.toggle('active', settings.leaderboard);
   const list = leaderboard.querySelector('ol')!;
-  list.innerHTML = snapshot.standings.map((racer) => `<li>${racer.definition.shortName} / L${racer.lap + 1}</li>`).join('');
+  list.innerHTML = snapshot.standings.map((racer) => `<li>${racer.definition.shortName} / L${visibleRacerLap(racer)}</li>`).join('');
 }
 
 function renderTrackMapRoute(): void {
@@ -596,8 +603,15 @@ function renderTrackMapRoute(): void {
   trackMapDotCount = 0;
   nearestAheadMeters = null;
   nearestBehindMeters = null;
+  readoutClosingAhead = false;
+  readoutClosingBehind = false;
+  readoutSideBySide = null;
+  nextBrakeMeters = null;
+  brakeUrgency = 'clear';
   gapAhead.textContent = 'Up --';
   gapBehind.textContent = 'Back --';
+  raceHint.textContent = 'Brake --';
+  raceHint.className = '';
 }
 
 function clearTrackMap(): void {
@@ -608,6 +622,11 @@ function clearTrackMap(): void {
   trackMapDotCount = 0;
   nearestAheadMeters = null;
   nearestBehindMeters = null;
+  readoutClosingAhead = false;
+  readoutClosingBehind = false;
+  readoutSideBySide = null;
+  nextBrakeMeters = null;
+  brakeUrgency = 'clear';
 }
 
 function updateTrackMap(snapshot: RaceSnapshot): void {
@@ -637,11 +656,26 @@ function updateTrackMap(snapshot: RaceSnapshot): void {
     }
   }
   trackMapDotCount = trackMapDotElements.size;
-  const summary = summarizeRaceReadability(snapshot, selectedTrack.lengthKm);
+  const summary = summarizeRaceReadability(snapshot, selectedTrack);
   nearestAheadMeters = summary.nearestAhead?.meters ?? null;
   nearestBehindMeters = summary.nearestBehind?.meters ?? null;
-  gapAhead.textContent = summary.nearestAhead ? `Up ${summary.nearestAhead.shortName} ${formatMeters(summary.nearestAhead.meters)}` : 'Up clear';
-  gapBehind.textContent = summary.nearestBehind ? `Back ${summary.nearestBehind.shortName} ${formatMeters(summary.nearestBehind.meters)}` : 'Back clear';
+  readoutClosingAhead = Boolean(summary.nearestAhead?.closing);
+  readoutClosingBehind = Boolean(summary.nearestBehind?.closing);
+  readoutSideBySide = summary.sideBySide ? `${summary.sideBySide.shortName} ${summary.sideBySide.side}` : null;
+  nextBrakeMeters = summary.nextBrakeMeters;
+  brakeUrgency = summary.brakeUrgency;
+  gapAhead.textContent = summary.nearestAhead
+    ? `Up ${summary.nearestAhead.shortName} ${formatMeters(summary.nearestAhead.meters)}${summary.nearestAhead.closing ? ' closing' : ''}`
+    : 'Up clear';
+  gapBehind.textContent = summary.nearestBehind
+    ? `Back ${summary.nearestBehind.shortName} ${formatMeters(summary.nearestBehind.meters)}${summary.nearestBehind.closing ? ' closing' : ''}`
+    : 'Back clear';
+  raceHint.textContent = summary.sideBySide
+    ? `Side ${summary.sideBySide.shortName} ${summary.sideBySide.side}`
+    : summary.nextBrakeMeters !== null
+      ? `${summary.brakeUrgency === 'now' ? 'Brake now' : 'Brake'} ${formatMeters(summary.nextBrakeMeters)}`
+      : 'Brake clear';
+  raceHint.className = summary.sideBySide ? 'danger' : summary.brakeUrgency;
 }
 
 function updateRadio(snapshot: RaceSnapshot): void {
@@ -972,6 +1006,11 @@ function exposeDebug(): void {
       trackMapDots: trackMapDotCount,
       nearestAheadMeters,
       nearestBehindMeters,
+      closingAhead: readoutClosingAhead,
+      closingBehind: readoutClosingBehind,
+      sideBySide: readoutSideBySide,
+      nextBrakeMeters,
+      brakeUrgency,
     },
     cpuRacecraft,
     campaignLeader: campaignLeader(campaignScores)?.name ?? null,
@@ -1071,4 +1110,9 @@ function formatTime(value: number): string {
 function formatMeters(value: number): string {
   if (value >= 1000) return `${(value / 1000).toFixed(1)}km`;
   return `${Math.max(1, value)}m`;
+}
+
+function visibleRacerLap(racer: RaceSnapshot['player']): number {
+  const totalLaps = mode === 'timeAttack' ? 1 : selectedTrack.laps;
+  return racer.finished ? totalLaps : Math.min(totalLaps, racer.lap + 1);
 }

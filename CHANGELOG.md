@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0 - 2026-06-26
+
+- Added active-race guidance for closing rivals, side-by-side threats, and upcoming braking zones.
+- Added a compact third HUD guidance line under the live track map.
+- Collapsed the full leaderboard on narrow mobile race screens to keep the forward road visible.
+- Clamped leaderboard lap labels to the active event lap count.
+
 ## 1.3.0 - 2026-06-26
 
 - Added CPU racecraft intent for corner braking, track-aware racing lines, traffic gaps, and overtaking lanes.
