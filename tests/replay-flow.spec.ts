@@ -36,6 +36,8 @@ test('plays a completed race replay with highlight commentary', async ({ page })
   expect(replayMetrics.replayPlayback.eventIndex).toBeGreaterThan(0);
   expect(replayMetrics.replayPlayback.focusRacerId).toBeTruthy();
   expect(replayMetrics.replayPlayback.lastEvent).toBeTruthy();
+  expect(replayMetrics.replayPlayback.lastEvent.lineId).toMatch(/^(arthur|mags|radio)\.replay\./);
+  expect(replayMetrics.replayPlayback.lastEvent.radioKey === null || ['damage', 'tires'].includes(replayMetrics.replayPlayback.lastEvent.radioKey)).toBe(true);
   expect(replayMetrics.replayPlayback.lastEvent.speaker).toBe(replayMetrics.caption.speaker);
   expect(replayMetrics.replayPlayback.lastEvent.focusRacerId ?? replayMetrics.replayPlayback.focusRacerId).toBe(replayMetrics.replayPlayback.focusRacerId);
   expect(replayMetrics.caption.active).toBe(true);

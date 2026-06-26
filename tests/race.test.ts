@@ -933,9 +933,18 @@ describe('replay recording', () => {
       { racerId: 'player', name: 'Test Driver', totalTime: 31, bestLap: 30, damage: 0.6, tires: 0.65 },
     ]);
     expect(events.map((event) => event.kind)).toEqual(['opening', 'move', 'damage', 'tires', 'finish']);
+    expect(events.map((event) => event.lineId)).toEqual([
+      'arthur.replay.opening-launch',
+      'mags.replay.middle-sector-commitment',
+      'radio.replay.damage-kerb-bite',
+      'radio.replay.tires-fading-inputs',
+      'arthur.replay.finish-rival-win',
+    ]);
     expect(events.every((event, index) => index === 0 || event.time >= events[index - 1].time)).toBe(true);
     expect(events.find((event) => event.kind === 'damage')?.speaker).toBe('Radio');
+    expect(events.find((event) => event.kind === 'damage')?.radioKey).toBe('damage');
     expect(events.find((event) => event.kind === 'tires')?.speaker).toBe('Radio');
+    expect(events.find((event) => event.kind === 'tires')?.radioKey).toBe('tires');
     expect(events.find((event) => event.kind === 'finish')?.focusRacerId).toBe('rival');
   });
 

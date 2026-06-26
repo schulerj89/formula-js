@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.29.2 - 2026-06-26
+
+- Added stable `lineId` and `radioKey` metadata to replay highlight events so replay commentary can be matched to planned/generated voice lines.
+- Exposed replay event metadata in debug metrics and added unit/browser coverage for replay line identity.
+
 ## 1.29.1 - 2026-06-26
 
 - Latched critical damage and tyre radio warnings per race so low-health calls do not alternate every frame once both systems are critical.

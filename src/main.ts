@@ -1561,8 +1561,10 @@ function buildDebugMetrics() {
       lastEvent: lastReplayEvent
         ? {
             kind: lastReplayEvent.kind,
+            lineId: lastReplayEvent.lineId,
             speaker: lastReplayEvent.speaker,
             focusRacerId: lastReplayEvent.focusRacerId ?? null,
+            radioKey: lastReplayEvent.radioKey,
           }
         : null,
     },
