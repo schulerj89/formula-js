@@ -17,6 +17,7 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await expect(page.getByRole('heading', { name: 'Race Setup' })).toBeHidden();
   await expect(page.getByRole('button', { name: 'Race' })).toBeHidden();
   await expect(page.getByRole('link', { name: 'Asset Inspector' })).toBeVisible();
+  await expect(page.locator('#menuFlyoverTrack')).toBeVisible();
   await expect(page.locator('[data-screen="menu"]')).toHaveAttribute('data-menu-stage', 'title');
   let menuMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics?.menu);
   expect(menuMetrics.setupOpen).toBe(false);
@@ -26,24 +27,42 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
     letterSpacing: '0px',
   });
   expect(menuMetrics.titleTreatment.width).toBeGreaterThan(160);
+  expect(menuMetrics.flyoverLabel).toMatchObject({
+    trackId: 'silverpine',
+    text: 'Silverpine Switchback',
+    visible: true,
+  });
   const titleLayout = await page.evaluate(() => {
     const title = document.querySelector<HTMLElement>('.brand-title')!;
+    const flyover = document.querySelector<HTMLElement>('.flyover-label')!;
     const actions = document.querySelector<HTMLElement>('.menu-actions')!;
     const titleRect = title.getBoundingClientRect();
+    const flyoverRect = flyover.getBoundingClientRect();
     const actionsRect = actions.getBoundingClientRect();
     return {
       titleBottom: titleRect.bottom,
+      flyoverTop: flyoverRect.top,
+      flyoverBottom: flyoverRect.bottom,
       actionsTop: actionsRect.top,
       viewportWidth: window.innerWidth,
       titleWidth: titleRect.width,
+      flyoverWidth: flyoverRect.width,
     };
   });
   expect(titleLayout.titleWidth).toBeLessThanOrEqual(titleLayout.viewportWidth);
+  expect(titleLayout.flyoverWidth).toBeLessThanOrEqual(titleLayout.viewportWidth);
   expect(titleLayout.titleBottom).toBeLessThan(titleLayout.actionsTop);
+  expect(titleLayout.titleBottom).toBeLessThan(titleLayout.flyoverTop);
+  expect(titleLayout.flyoverBottom).toBeLessThan(titleLayout.actionsTop);
   await page.screenshot({ path: testInfo.outputPath('title-menu.png'), fullPage: true });
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.previewTrack !== (window as any).__GRIDLINE_APEX__?.metrics?.track, null, {
     timeout: 10_000,
   });
+  menuMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
+  expect(menuMetrics.menu.flyoverLabel.visible).toBe(true);
+  expect(menuMetrics.menu.flyoverLabel.trackId).toBe(menuMetrics.previewTrack);
+  await expect(page.locator('#menuFlyoverTrack')).not.toHaveText('Silverpine Switchback');
+  await page.screenshot({ path: testInfo.outputPath('title-menu-flyover.png'), fullPage: true });
   await page.getByRole('button', { name: 'Garage' }).click();
   await expect(page.getByRole('heading', { name: 'Race Setup' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Race' })).toBeVisible();

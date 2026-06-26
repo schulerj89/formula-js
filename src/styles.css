@@ -177,6 +177,35 @@ h1 {
   font-size: 3.65rem;
 }
 
+.flyover-label {
+  display: grid;
+  width: min(420px, 100%);
+  gap: 2px;
+  padding: 8px 0;
+  border-top: 1px solid rgb(247 201 72 / 72%);
+  border-bottom: 1px solid rgb(223 247 255 / 32%);
+  text-shadow: 0 2px 12px rgb(0 0 0 / 52%);
+}
+
+.flyover-label span {
+  color: #dff7ff;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0px;
+  text-transform: uppercase;
+}
+
+.flyover-label strong {
+  overflow: hidden;
+  color: #f7fbff;
+  font-size: 0.9rem;
+  line-height: 1.1;
+  letter-spacing: 0px;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 h2,
 h3,
 p {
@@ -810,6 +839,15 @@ p {
 
   .brand-line-apex {
     font-size: 3.15rem;
+  }
+
+  .flyover-label {
+    width: min(360px, 100%);
+    padding: 7px 0;
+  }
+
+  .flyover-label strong {
+    font-size: 0.78rem;
   }
 
   .primary,

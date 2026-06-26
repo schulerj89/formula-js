@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.31.0 - 2026-06-26
+
+- Added a compact visible title flyover label so the rotating menu camera names the currently previewed track without reopening title clutter.
+- Exposed flyover label state in debug metrics and added screenshot coverage for the label before and after the menu track cycle.
+
 ## 1.30.1 - 2026-06-26
 
 - Tightened standing agent guidance for uncertain expert decisions, title decluttering, isolated asset inspection, and dedicated radio voice identity.

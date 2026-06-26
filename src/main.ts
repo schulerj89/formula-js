@@ -145,6 +145,10 @@ root.innerHTML = `
           <span class="brand-line brand-line-grid">Gridline</span>
           <span class="brand-line brand-line-apex">Apex</span>
         </h1>
+        <div class="flyover-label" aria-live="polite">
+          <span>Flyover</span>
+          <strong id="menuFlyoverTrack"></strong>
+        </div>
         <div class="menu-actions">
           <button class="primary" data-action="campaign">Campaign</button>
           <button class="secondary" data-action="timeAttack">Time Attack</button>
@@ -290,6 +294,7 @@ const trackSelect = root.querySelector<HTMLSelectElement>('#trackSelect')!;
 const trackStrip = root.querySelector<HTMLDivElement>('#trackStrip')!;
 const menuScreen = root.querySelector<HTMLElement>('[data-screen="menu"]')!;
 const brandTitle = root.querySelector<HTMLElement>('.brand-title')!;
+const menuFlyoverTrack = root.querySelector<HTMLElement>('#menuFlyoverTrack')!;
 const setupPanel = root.querySelector<HTMLDivElement>('#setupPanel')!;
 const bodyPaintSwatches = root.querySelector<HTMLDivElement>('#bodyPaintSwatches')!;
 const helmetPaintSwatches = root.querySelector<HTMLDivElement>('#helmetPaintSwatches')!;
@@ -643,6 +648,7 @@ function loadMenuScene(): void {
   menuPreviewTrack = selectedTrack;
   menuFlyoverIndex = tracks.findIndex((track) => track.id === selectedTrack.id);
   menuFlyoverTimer = 7;
+  syncMenuFlyoverLabel();
   sceneBuild = buildTrackedRaceScene(menuPreviewTrack, buildRacers());
   clearTrackMap();
   race = null;
@@ -709,7 +715,7 @@ function updateMenuCamera(dt: number, cycleTracks: boolean): void {
       menuPreviewTrack = tracks[menuFlyoverIndex];
       sceneBuild = buildTrackedRaceScene(menuPreviewTrack, buildRacers());
       menuFlyoverTimer = 7;
-      showCaption('Arthur Bell', `Track preview: ${menuPreviewTrack.name}.`);
+      syncMenuFlyoverLabel();
     }
   }
   const t = (performance.now() * 0.000035) % 1;
@@ -993,6 +999,12 @@ function showCaption(name: string, text: string, duration = 5.5, lineId?: string
   if (!captionQueueSpeakers.includes(name)) captionQueueSpeakers.push(name);
   captionTimer = duration;
   audio.speak(name, text, lineId);
+}
+
+function syncMenuFlyoverLabel(): void {
+  menuFlyoverTrack.textContent = menuPreviewTrack.name;
+  menuFlyoverTrack.dataset.trackId = menuPreviewTrack.id;
+  invalidateDebugMetrics();
 }
 
 function renderPodium(): void {
@@ -1537,6 +1549,11 @@ function buildDebugMetrics() {
         letterSpacing: titleLetterSpacing === 'normal' ? '0px' : titleLetterSpacing,
         computedLetterSpacing: titleLetterSpacing,
         width: Math.round(brandTitle.getBoundingClientRect().width),
+      },
+      flyoverLabel: {
+        trackId: menuFlyoverTrack.dataset.trackId ?? null,
+        text: menuFlyoverTrack.textContent,
+        visible: menuFlyoverTrack.offsetParent !== null,
       },
     },
     track: selectedTrack.id,
