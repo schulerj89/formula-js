@@ -2,9 +2,9 @@ import type { RaceSnapshot, RacerState } from './race';
 import type { RaceReadabilitySummary } from './raceReadability';
 
 export type RaceCommentaryKind =
-  | 'radio-contact'
-  | 'radio-damage'
-  | 'radio-tires'
+  | 'radio-team-contact'
+  | 'radio-team-damage'
+  | 'radio-team-tires'
   | 'position-gained'
   | 'position-lost'
   | 'spotter-side'
@@ -96,7 +96,7 @@ export function createSpotterCommentary(summary: RaceReadabilitySummary): RaceCo
 function createCriticalRadioEvent(snapshot: RaceSnapshot, lastRadio: string, lastContactRadioEvent: number): RaceCommentaryEvent | null {
   if (snapshot.player.contactEvents > lastContactRadioEvent && snapshot.player.lastContactSeverity > 0.22) {
     return {
-      kind: 'radio-contact',
+      kind: 'radio-team-contact',
       lineId: 'radio.contact.damage-check',
       priority: 4,
       speaker: 'Radio',
@@ -107,7 +107,7 @@ function createCriticalRadioEvent(snapshot: RaceSnapshot, lastRadio: string, las
   }
   if (snapshot.player.damage < 0.45 && lastRadio !== 'damage') {
     return {
-      kind: 'radio-damage',
+      kind: 'radio-team-damage',
       lineId: 'radio.damage.climbing',
       priority: 4,
       speaker: 'Radio',
@@ -118,7 +118,7 @@ function createCriticalRadioEvent(snapshot: RaceSnapshot, lastRadio: string, las
   }
   if (snapshot.player.tires < 0.38 && lastRadio !== 'tires') {
     return {
-      kind: 'radio-tires',
+      kind: 'radio-team-tires',
       lineId: 'radio.tires.fading',
       priority: 4,
       speaker: 'Radio',

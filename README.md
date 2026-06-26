@@ -7,14 +7,14 @@ Mobile-first Three.js formula racing game.
 - `npm run dev` starts the local game.
 - `npm run build` typechecks and builds.
 - `npm test` runs data/runtime tests.
-- `npm run screenshot` captures menu and gameplay artifacts.
+- `npm run screenshot` captures menu, gameplay, and asset-inspector artifacts.
 - `npm run audio:plan` refreshes the dry-run ElevenLabs audio manifest.
 - `npm run audio:generate` generates ElevenLabs MP3s when voice IDs and an API key are configured locally.
 - `npm run assets:meshy:preview` starts the Meshy preview workflow from the formula-kit manifest when a Meshy key is configured locally.
 
 ## Current Slice
 
-- Title menu with track flyover camera.
+- Decluttered title menu with track flyover camera, primary race actions, and secondary utility links.
 - Campaign, time attack, settings, replay, and podium flow.
 - Tutorial panel with launch, braking, tyre, and damage guidance.
 - Five-red-light pre-race start sequence with announcer setup.
@@ -25,10 +25,12 @@ Mobile-first Three.js formula racing game.
 - Procedural menu, pre-race, podium, and finale music with no music during active racing.
 - Gear/rev-shaped formula engine audio with tire scrub, kerb/off-track thumps, and radio ducking metrics.
 - Announcer/radio speech hooks plus optional ElevenLabs MP3 playback when generated assets exist.
+- Radio team lines use their own planned ElevenLabs voice ID and a compressed pit-wall fallback profile.
 - Procedural music and browser speech fallbacks when ElevenLabs assets are missing or blocked.
 - Dynamic active-race commentary for position gains/losses with cooldown and radio-priority metrics.
 - Player garage paint swatches for body and helmet customization.
 - GPT-image reference art, Meshy preview GLBs, and a runtime loader for modular chassis, wheel, and driver assets.
+- Isolated asset inspector page for checking generated GLBs and the procedural fallback away from the main game.
 - Shared driver rig with separate customizable helmet, visor, generated suit support, idle motion, and podium celebration arms.
 - Generated asset metadata tracks actual GLB triangles to keep high-detail mode under the browser render budget.
 - Four procedural race circuits with red/white kerbs, trees, buildings, and landmarks.

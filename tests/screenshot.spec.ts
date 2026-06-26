@@ -6,6 +6,8 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await page.goto('/');
   await page.waitForFunction(() => Boolean((window as any).__GRIDLINE_APEX__?.ready));
   await expect(page.getByRole('heading', { name: 'Gridline Apex' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Race Setup' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Asset Inspector' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('title-menu.png'), fullPage: true });
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.previewTrack !== (window as any).__GRIDLINE_APEX__?.metrics?.track, null, {
     timeout: 10_000,
@@ -90,7 +92,7 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.contact.totalEvents).toBeGreaterThanOrEqual(metrics.contact.playerEvents);
   expect(metrics.raceCommentary.callouts).toBeGreaterThan(1);
   expect(metrics.raceCommentary.spotterCallouts).toBeGreaterThan(0);
-  expect(metrics.raceCommentary.lastKind).toBe('radio-contact');
+  expect(metrics.raceCommentary.lastKind).toBe('radio-team-contact');
   expect(metrics.raceCommentary.lastLineId).toBe('radio.contact.damage-check');
   expect(metrics.raceCommentary.lastPriority).toBe(4);
   expect(metrics.raceCommentary.lastSpeaker).toBe('Radio');

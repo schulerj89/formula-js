@@ -1,6 +1,6 @@
 import type { MusicCueId } from './audio';
 
-export type VoiceAssetId = 'arthur-prerace' | 'mags-lights' | 'radio-damage';
+export type VoiceAssetId = 'arthur-prerace' | 'mags-lights' | 'radio-team-damage' | 'radio-team-contact' | 'radio-team-tires';
 export type SongAssetId = 'menu-gridline-spark' | 'prerace-five-lights-rising' | 'podium-carbon-champagne' | 'finale-apex-parade';
 
 export interface ElevenLabsVoiceAsset {
@@ -30,10 +30,22 @@ export const elevenLabsVoiceAssets: ElevenLabsVoiceAsset[] = [
     match: /^Five red lights, then it is noise, nerves, and no excuses\.$/i,
   },
   {
-    id: 'radio-damage',
+    id: 'radio-team-damage',
     speaker: 'Radio',
-    src: '/audio/elevenlabs/radio-damage.mp3',
+    src: '/audio/elevenlabs/radio-team-damage.mp3',
     match: /^Damage is climbing\. Stay off the outside kerbs and bring it home\.$/i,
+  },
+  {
+    id: 'radio-team-contact',
+    speaker: 'Radio',
+    src: '/audio/elevenlabs/radio-team-contact.mp3',
+    match: /^Contact confirmed\. Check the front wing and give them space\.$/i,
+  },
+  {
+    id: 'radio-team-tires',
+    speaker: 'Radio',
+    src: '/audio/elevenlabs/radio-team-tires.mp3',
+    match: /^Tyres are fading\. Brake earlier and keep the steering smooth\.$/i,
   },
 ];
 

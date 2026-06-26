@@ -114,13 +114,16 @@ root.innerHTML = `
         <div class="menu-actions">
           <button class="primary" data-action="campaign">Campaign</button>
           <button class="secondary" data-action="timeAttack">Time Attack</button>
+        </div>
+        <div class="menu-utility">
           <button class="secondary" data-action="tutorial">Tutorial</button>
           <button class="secondary" data-action="settings">Settings</button>
           <button class="secondary" data-action="replay">Replay</button>
+          <a class="secondary utility-link" href="asset-inspector.html">Asset Inspector</a>
         </div>
       </div>
-      <div class="panel">
-        <h2>Driver Setup</h2>
+      <div class="panel setup-panel">
+        <h2>Race Setup</h2>
         <div class="setup-grid">
           <label class="field"><span>Name</span><input id="playerName" maxlength="18" /></label>
           <label class="field"><span>Track</span><select id="trackSelect"></select></label>

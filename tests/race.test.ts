@@ -106,12 +106,19 @@ describe('audio data', () => {
 
   it('maps ElevenLabs runtime assets to non-race music cues and key voice lines', () => {
     expect(elevenLabsSongAssets.map((asset) => asset.cue).sort()).toEqual(['finale', 'menu', 'podium', 'prerace']);
-    expect(elevenLabsVoiceAssets).toHaveLength(3);
+    expect(elevenLabsVoiceAssets).toHaveLength(5);
+    expect(elevenLabsVoiceAssets.filter((asset) => asset.speaker === 'Radio').map((asset) => asset.id).sort()).toEqual([
+      'radio-team-contact',
+      'radio-team-damage',
+      'radio-team-tires',
+    ]);
     expect(
       matchVoiceAsset('Arthur Bell', 'Silverpine Switchback looks magnificent today: fast entries, dangerous exits, and very honest kerbs.')?.id,
     ).toBe('arthur-prerace');
     expect(matchVoiceAsset('Mags Whitlow', 'Five red lights, then it is noise, nerves, and no excuses.')?.id).toBe('mags-lights');
-    expect(matchVoiceAsset('Radio', 'Damage is climbing. Stay off the outside kerbs and bring it home.')?.id).toBe('radio-damage');
+    expect(matchVoiceAsset('Radio', 'Damage is climbing. Stay off the outside kerbs and bring it home.')?.id).toBe('radio-team-damage');
+    expect(matchVoiceAsset('Radio', 'Contact confirmed. Check the front wing and give them space.')?.id).toBe('radio-team-contact');
+    expect(matchVoiceAsset('Radio', 'Tyres are fading. Brake earlier and keep the steering smooth.')?.id).toBe('radio-team-tires');
   });
 
   it('maps race state into gear, rev, tire, and kerb audio feedback', () => {
@@ -214,7 +221,7 @@ describe('audio data', () => {
       loadedVoices: Map<string, HTMLAudioElement>;
     };
     internals.loadedVoices.set('mags-lights', firstVoice);
-    internals.loadedVoices.set('radio-damage', secondVoice);
+    internals.loadedVoices.set('radio-team-damage', secondVoice);
 
     audio.speak('Mags Whitlow', 'Five red lights, then it is noise, nerves, and no excuses.');
     audio.speak('Radio', 'Damage is climbing. Stay off the outside kerbs and bring it home.');
@@ -226,7 +233,7 @@ describe('audio data', () => {
     expect(firstVoice.currentTime).toBe(0);
     expect(secondVoice.play).toHaveBeenCalledOnce();
     expect(metrics.assets.generatedSpeechEvents).toBe(1);
-    expect(metrics.assets.activeGeneratedVoice).toBe('radio-damage');
+    expect(metrics.assets.activeGeneratedVoice).toBe('radio-team-damage');
   });
 });
 
@@ -438,7 +445,7 @@ describe('race simulation', () => {
       lastContactRadioEvent: 0,
     });
 
-    expect(event?.kind).toBe('radio-contact');
+    expect(event?.kind).toBe('radio-team-contact');
     expect(event?.lineId).toBe('radio.contact.damage-check');
     expect(event?.priority).toBe(4);
     expect(event?.speaker).toBe('Radio');

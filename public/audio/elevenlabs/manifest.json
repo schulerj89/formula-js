@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-26T07:54:44.763Z",
+  "generatedAt": "2026-06-26T08:05:08.678Z",
   "dryRun": true,
   "sources": {
     "tts": "https://api.elevenlabs.io/v1/text-to-speech/:voice_id",
@@ -23,11 +23,27 @@
       "status": "planned"
     },
     {
-      "id": "radio-damage",
+      "id": "radio-team-damage",
       "speaker": "Radio",
-      "voiceEnv": "ELEVENLABS_ARTHUR_VOICE_ID",
+      "voiceEnv": "ELEVENLABS_RADIO_VOICE_ID",
       "text": "Damage is climbing. Stay off the outside kerbs and bring it home.",
-      "file": "public/audio/elevenlabs/radio-damage.mp3",
+      "file": "public/audio/elevenlabs/radio-team-damage.mp3",
+      "status": "planned"
+    },
+    {
+      "id": "radio-team-contact",
+      "speaker": "Radio",
+      "voiceEnv": "ELEVENLABS_RADIO_VOICE_ID",
+      "text": "Contact confirmed. Check the front wing and give them space.",
+      "file": "public/audio/elevenlabs/radio-team-contact.mp3",
+      "status": "planned"
+    },
+    {
+      "id": "radio-team-tires",
+      "speaker": "Radio",
+      "voiceEnv": "ELEVENLABS_RADIO_VOICE_ID",
+      "text": "Tyres are fading. Brake earlier and keep the steering smooth.",
+      "file": "public/audio/elevenlabs/radio-team-tires.mp3",
       "status": "planned"
     }
   ],

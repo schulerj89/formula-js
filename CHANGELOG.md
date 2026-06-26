@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.0 - 2026-06-26
+
+- Split planned radio-team ElevenLabs lines onto a dedicated `ELEVENLABS_RADIO_VOICE_ID` with contact, damage, and tire call assets.
+- Decluttered the title menu by separating primary race actions from utility links and tightening the race setup panel.
+- Added an isolated asset inspector page for generated chassis, wheel, driver, and procedural fallback QA.
+- Added smoke coverage for the asset inspector and documented the unsure-decision expert/subagent rule in `AGENTS.md`.
+
 ## 1.9.0 - 2026-06-26
 
 - Added queued podium and campaign-finale commentary that names the winner, player result, top three, and championship standings.

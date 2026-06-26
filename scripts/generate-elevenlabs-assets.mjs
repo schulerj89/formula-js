@@ -21,10 +21,22 @@ const voiceLines = [
     text: 'Five red lights, then it is noise, nerves, and no excuses.',
   },
   {
-    id: 'radio-damage',
+    id: 'radio-team-damage',
     speaker: 'Radio',
-    voiceEnv: 'ELEVENLABS_ARTHUR_VOICE_ID',
+    voiceEnv: 'ELEVENLABS_RADIO_VOICE_ID',
     text: 'Damage is climbing. Stay off the outside kerbs and bring it home.',
+  },
+  {
+    id: 'radio-team-contact',
+    speaker: 'Radio',
+    voiceEnv: 'ELEVENLABS_RADIO_VOICE_ID',
+    text: 'Contact confirmed. Check the front wing and give them space.',
+  },
+  {
+    id: 'radio-team-tires',
+    speaker: 'Radio',
+    voiceEnv: 'ELEVENLABS_RADIO_VOICE_ID',
+    text: 'Tyres are fading. Brake earlier and keep the steering smooth.',
   },
 ];
 
@@ -82,8 +94,8 @@ for (const line of voiceLines) {
     model_id: 'eleven_multilingual_v2',
     voice_settings: {
       stability: line.speaker === 'Mags Whitlow' ? 0.42 : 0.58,
-      similarity_boost: 0.78,
-      style: line.speaker === 'Radio' ? 0.18 : 0.35,
+      similarity_boost: line.speaker === 'Radio' ? 0.7 : 0.78,
+      style: line.speaker === 'Radio' ? 0.08 : 0.35,
       use_speaker_boost: true,
     },
   });

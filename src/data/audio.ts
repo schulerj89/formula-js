@@ -66,8 +66,8 @@ export const announcerVoiceProfiles = {
     pitch: 1.08,
   },
   Radio: {
-    accent: 'pit wall radio',
-    rate: 1.08,
-    pitch: 0.72,
+    accent: 'compressed pit wall radio operator',
+    rate: 1.12,
+    pitch: 0.64,
   },
 } as const;
