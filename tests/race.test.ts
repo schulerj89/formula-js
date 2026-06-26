@@ -197,7 +197,7 @@ describe('audio data', () => {
 
   it('maps ElevenLabs runtime assets to non-race music cues and key voice lines', () => {
     expect(elevenLabsSongAssets.map((asset) => asset.cue).sort()).toEqual(['finale', 'menu', 'podium', 'prerace']);
-    expect(elevenLabsVoiceAssets).toHaveLength(9);
+    expect(elevenLabsVoiceAssets).toHaveLength(12);
     expect(elevenLabsVoiceAssets.filter((asset) => asset.speaker === 'Arthur Bell').map((asset) => asset.id).sort()).toEqual([
       'arthur-prerace',
       'arthur-prerace-marina-track',
@@ -205,7 +205,13 @@ describe('audio data', () => {
       'arthur-prerace-silverpine-track',
       'arthur-prerace-valkyrie-track',
     ]);
+    expect(elevenLabsVoiceAssets.filter((asset) => asset.speaker === 'Mags Whitlow').map((asset) => asset.id).sort()).toEqual([
+      'mags-lights',
+      'mags-replay-middle-sector',
+    ]);
     expect(elevenLabsVoiceAssets.filter((asset) => asset.speaker === 'Radio').map((asset) => asset.id).sort()).toEqual([
+      'radio-replay-damage',
+      'radio-replay-tires',
       'radio-team-contact',
       'radio-team-damage',
       'radio-team-tires',
@@ -249,6 +255,11 @@ describe('audio data', () => {
     );
     expect(matchVoiceAsset('Radio', 'Contact confirmed. Check the front wing and give them space.')?.id).toBe('radio-team-contact');
     expect(matchVoiceAsset('Radio', 'Tyres are fading. Brake earlier and keep the steering smooth.')?.id).toBe('radio-team-tires');
+    expect(matchVoiceAsset('Mags Whitlow', 'Watch the middle sector here: confidence on entry, tiny correction, then full commitment on exit.')?.id).toBe(
+      'mags-replay-middle-sector',
+    );
+    expect(matchVoiceAsset('Radio', 'Replay confirms the damage warning. The outside kerb took a proper bite.')?.id).toBe('radio-replay-damage');
+    expect(matchVoiceAsset('Radio', 'The tyres were fading here, and every steering input started costing lap time.')?.id).toBe('radio-replay-tires');
   });
 
   it('keeps the ElevenLabs manifest aligned with runtime assets and the dedicated radio voice ID', () => {
@@ -274,7 +285,13 @@ describe('audio data', () => {
         .filter((asset) => asset.speaker === 'Radio')
         .map((asset) => asset.voiceEnv)
         .sort(),
-    ).toEqual(['ELEVENLABS_RADIO_VOICE_ID', 'ELEVENLABS_RADIO_VOICE_ID', 'ELEVENLABS_RADIO_VOICE_ID']);
+    ).toEqual([
+      'ELEVENLABS_RADIO_VOICE_ID',
+      'ELEVENLABS_RADIO_VOICE_ID',
+      'ELEVENLABS_RADIO_VOICE_ID',
+      'ELEVENLABS_RADIO_VOICE_ID',
+      'ELEVENLABS_RADIO_VOICE_ID',
+    ]);
     expect(elevenLabsManifest.voiceLines.some((asset) => asset.speaker === 'Radio' && asset.voiceEnv !== 'ELEVENLABS_RADIO_VOICE_ID')).toBe(
       false,
     );

@@ -63,6 +63,13 @@ const voiceLines = [
     text: 'Five red lights, then it is noise, nerves, and no excuses.',
   },
   {
+    id: 'mags-replay-middle-sector',
+    speaker: 'Mags Whitlow',
+    voiceEnv: 'ELEVENLABS_MAGS_VOICE_ID',
+    lineIds: ['mags.replay.middle-sector-commitment'],
+    text: 'Watch the middle sector here: confidence on entry, tiny correction, then full commitment on exit.',
+  },
+  {
     id: 'radio-team-damage',
     speaker: 'Radio',
     voiceEnv: 'ELEVENLABS_RADIO_VOICE_ID',
@@ -82,6 +89,20 @@ const voiceLines = [
     voiceEnv: 'ELEVENLABS_RADIO_VOICE_ID',
     lineIds: ['radio.tires.fading'],
     text: 'Tyres are fading. Brake earlier and keep the steering smooth.',
+  },
+  {
+    id: 'radio-replay-damage',
+    speaker: 'Radio',
+    voiceEnv: 'ELEVENLABS_RADIO_VOICE_ID',
+    lineIds: ['radio.replay.damage-kerb-bite'],
+    text: 'Replay confirms the damage warning. The outside kerb took a proper bite.',
+  },
+  {
+    id: 'radio-replay-tires',
+    speaker: 'Radio',
+    voiceEnv: 'ELEVENLABS_RADIO_VOICE_ID',
+    lineIds: ['radio.replay.tires-fading-inputs'],
+    text: 'The tyres were fading here, and every steering input started costing lap time.',
   },
 ];
 

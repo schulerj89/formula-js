@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-26T12:20:34.249Z",
+  "generatedAt": "2026-06-26T12:24:17.472Z",
   "dryRun": true,
   "sources": {
     "tts": "https://api.elevenlabs.io/v1/text-to-speech/:voice_id",
@@ -73,6 +73,17 @@
       "status": "planned"
     },
     {
+      "id": "mags-replay-middle-sector",
+      "speaker": "Mags Whitlow",
+      "voiceEnv": "ELEVENLABS_MAGS_VOICE_ID",
+      "lineIds": [
+        "mags.replay.middle-sector-commitment"
+      ],
+      "text": "Watch the middle sector here: confidence on entry, tiny correction, then full commitment on exit.",
+      "file": "public/audio/elevenlabs/mags-replay-middle-sector.mp3",
+      "status": "planned"
+    },
+    {
       "id": "radio-team-damage",
       "speaker": "Radio",
       "voiceEnv": "ELEVENLABS_RADIO_VOICE_ID",
@@ -103,6 +114,28 @@
       ],
       "text": "Tyres are fading. Brake earlier and keep the steering smooth.",
       "file": "public/audio/elevenlabs/radio-team-tires.mp3",
+      "status": "planned"
+    },
+    {
+      "id": "radio-replay-damage",
+      "speaker": "Radio",
+      "voiceEnv": "ELEVENLABS_RADIO_VOICE_ID",
+      "lineIds": [
+        "radio.replay.damage-kerb-bite"
+      ],
+      "text": "Replay confirms the damage warning. The outside kerb took a proper bite.",
+      "file": "public/audio/elevenlabs/radio-replay-damage.mp3",
+      "status": "planned"
+    },
+    {
+      "id": "radio-replay-tires",
+      "speaker": "Radio",
+      "voiceEnv": "ELEVENLABS_RADIO_VOICE_ID",
+      "lineIds": [
+        "radio.replay.tires-fading-inputs"
+      ],
+      "text": "The tyres were fading here, and every steering input started costing lap time.",
+      "file": "public/audio/elevenlabs/radio-replay-tires.mp3",
       "status": "planned"
     }
   ],

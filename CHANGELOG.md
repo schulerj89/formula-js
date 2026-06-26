@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.30.0 - 2026-06-26
+
+- Added planned ElevenLabs voice assets for the fixed replay middle-sector, replay damage, and replay tyre highlight lines.
+- Kept dynamic replay opening and finish calls on runtime speech because they include track, player, and winner names.
+
 ## 1.29.4 - 2026-06-26
 
 - Added stable `lineIds` to the ElevenLabs voice generation plan and checked manifest.

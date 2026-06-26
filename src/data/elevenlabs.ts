@@ -9,9 +9,12 @@ export type VoiceAssetId =
   | 'arthur-prerace-neon-track'
   | 'arthur-prerace-valkyrie-track'
   | 'mags-lights'
+  | 'mags-replay-middle-sector'
   | 'radio-team-damage'
   | 'radio-team-contact'
-  | 'radio-team-tires';
+  | 'radio-team-tires'
+  | 'radio-replay-damage'
+  | 'radio-replay-tires';
 export type SongAssetId = 'menu-gridline-spark' | 'prerace-five-lights-rising' | 'podium-carbon-champagne' | 'finale-apex-parade';
 
 export interface ElevenLabsVoiceAsset {
@@ -54,6 +57,13 @@ export const elevenLabsVoiceAssets: ElevenLabsVoiceAsset[] = [
     match: /^Five red lights, then it is noise, nerves, and no excuses\.$/i,
   },
   {
+    id: 'mags-replay-middle-sector',
+    speaker: 'Mags Whitlow',
+    src: '/audio/elevenlabs/mags-replay-middle-sector.mp3',
+    lineIds: ['mags.replay.middle-sector-commitment'],
+    match: /^Watch the middle sector here: confidence on entry, tiny correction, then full commitment on exit\.$/i,
+  },
+  {
     id: 'radio-team-damage',
     speaker: 'Radio',
     src: '/audio/elevenlabs/radio-team-damage.mp3',
@@ -73,6 +83,20 @@ export const elevenLabsVoiceAssets: ElevenLabsVoiceAsset[] = [
     src: '/audio/elevenlabs/radio-team-tires.mp3',
     lineIds: ['radio.tires.fading'],
     match: /^Tyres are fading\. Brake earlier and keep the steering smooth\.$/i,
+  },
+  {
+    id: 'radio-replay-damage',
+    speaker: 'Radio',
+    src: '/audio/elevenlabs/radio-replay-damage.mp3',
+    lineIds: ['radio.replay.damage-kerb-bite'],
+    match: /^Replay confirms the damage warning\. The outside kerb took a proper bite\.$/i,
+  },
+  {
+    id: 'radio-replay-tires',
+    speaker: 'Radio',
+    src: '/audio/elevenlabs/radio-replay-tires.mp3',
+    lineIds: ['radio.replay.tires-fading-inputs'],
+    match: /^The tyres were fading here, and every steering input started costing lap time\.$/i,
   },
 ];
 
