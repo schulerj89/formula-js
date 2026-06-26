@@ -22,6 +22,7 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
 
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.assetStatus?.generatedReady, null, { timeout: 20_000 });
   await page.getByRole('button', { name: 'Settings' }).click();
+  await page.locator('#controlMode').selectOption('holdToGo');
   await page.locator('#performanceMode').selectOption(isMobile ? 'balanced' : 'highDetail');
   await page.getByRole('button', { name: 'Done' }).click();
 
@@ -36,6 +37,8 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'race');
   await expect(page.locator('#startLights')).toBeHidden();
   await expect(page.locator('#raceReadout')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Hold go, release to brake' })).toBeVisible();
+  await expect(page.locator('[data-control="brake"]')).toBeHidden();
   await page.keyboard.down('Space');
   await page.waitForTimeout(8000);
   await page.keyboard.up('Space');
@@ -104,6 +107,9 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.leaderboard.playerPosition).toBeGreaterThanOrEqual(1);
   expect(metrics.leaderboard.playerPosition).toBeLessThanOrEqual(8);
   if (isMobile) expect(metrics.leaderboard.open).toBe(true);
+  expect(metrics.controlLayout.mode).toBe('holdToGo');
+  expect(metrics.controlLayout.brakeVisible).toBe(false);
+  expect(metrics.controlLayout.goLabel).toBe('Hold Go');
   expect(metrics.playerHandling.grip).toBeGreaterThan(0);
   expect(metrics.playerHandling.steeringResponse).toBeGreaterThan(0);
   expect(metrics.playerHandling.cornerLoad).toBeGreaterThanOrEqual(0);

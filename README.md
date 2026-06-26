@@ -48,6 +48,7 @@ Keep ElevenLabs credentials outside git. The generator reads `ELEVENLABS_API_KEY
 - Four procedural race circuits with red/white kerbs, trees, buildings, and landmarks.
 - Player plus seven CPU drivers with static names.
 - Press-to-go or split brake/go mobile controls.
+- Mode-aware race controls: hold-to-go shows one wider pedal, split-pedals shows separate Brake and Go buttons.
 - Damage, tire wear, race radio, leaderboard toggle, standings, and performance overlay.
 - Lightweight car-contact damage with speed loss, separation, and radio feedback.
 - Live track map with player/rival dots plus nearest ahead/behind race gaps.

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.19.0 - 2026-06-26
+
+- Made on-screen race controls visually match the selected control mode.
+- Hid the Brake pedal and widened the Go pedal in hold-to-go mode.
+- Kept separate Brake and Go pedals visible in split-pedals mode.
+- Added browser coverage and debug metrics for the active control layout.
+
 ## 1.18.0 - 2026-06-26
 
 - Added replay playback debug metrics for active state, duration, event progress, focus racer, last delivered replay event, and retained frame count.

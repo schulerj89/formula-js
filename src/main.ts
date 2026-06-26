@@ -273,6 +273,8 @@ const helmetPaintSwatches = root.querySelector<HTMLDivElement>('#helmetPaintSwat
 const caption = root.querySelector<HTMLDivElement>('#caption')!;
 const startLights = root.querySelector<HTMLDivElement>('#startLights')!;
 const controls = root.querySelector<HTMLDivElement>('#controls')!;
+const goPedal = root.querySelector<HTMLButtonElement>('[data-control="go"]')!;
+const brakePedal = root.querySelector<HTMLButtonElement>('[data-control="brake"]')!;
 const hud = root.querySelector<HTMLDivElement>('.hud')!;
 const leaderboard = root.querySelector<HTMLElement>('#leaderboard')!;
 const debug = root.querySelector<HTMLElement>('#debug')!;
@@ -335,6 +337,7 @@ function initUi(): void {
   root.querySelector<HTMLInputElement>('#realisticTires')!.checked = settings.realisticTires;
   root.querySelector<HTMLInputElement>('#realisticDamage')!.checked = settings.realisticDamage;
   root.querySelector<HTMLInputElement>('#leaderboardToggle')!.checked = settings.leaderboard;
+  updateControlLayout();
 
   if (uiBound) return;
   uiBound = true;
@@ -544,6 +547,7 @@ function startRace(): void {
   audio.stopMusic();
   hud.classList.add('active');
   controls.classList.add('active');
+  updateControlLayout();
   control.brake = false;
   control.throttle = false;
   control.steer = 0;
@@ -1278,7 +1282,17 @@ function syncSettingsFromUi(): void {
   settings.realisticDamage = root.querySelector<HTMLInputElement>('#realisticDamage')!.checked;
   settings.leaderboard = root.querySelector<HTMLInputElement>('#leaderboardToggle')!.checked;
   renderer.setPixelRatio(targetPixelRatio());
+  updateControlLayout();
   saveSettings();
+}
+
+function updateControlLayout(): void {
+  controls.dataset.mode = settings.controlMode;
+  const holdMode = settings.controlMode === 'holdToGo';
+  brakePedal.hidden = holdMode;
+  goPedal.textContent = holdMode ? 'Hold Go' : 'Go';
+  goPedal.setAttribute('aria-label', holdMode ? 'Hold go, release to brake' : 'Go');
+  brakePedal.setAttribute('aria-label', 'Brake');
 }
 
 function saveSettings(): void {
@@ -1450,6 +1464,13 @@ function buildDebugMetrics() {
       rowCount: leaderboardList.children.length,
       playerPosition: latestSnapshot?.position ?? null,
       renders: leaderboardRenderCount,
+    },
+    controlLayout: {
+      mode: settings.controlMode,
+      brakeVisible: !brakePedal.hidden,
+      visiblePedals: [...controls.querySelectorAll<HTMLButtonElement>('.pedal')].filter((pedal) => !pedal.hidden).length,
+      goLabel: goPedal.textContent,
+      goAriaLabel: goPedal.getAttribute('aria-label'),
     },
     playerHandling: latestSnapshot?.player.handling ?? null,
     cpuRacecraft,
