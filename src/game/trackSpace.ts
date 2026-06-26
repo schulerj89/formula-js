@@ -1,6 +1,7 @@
-import type { TrackDefinition } from '../types';
+import type { GameSettings, SteeringAssistMode, TrackDefinition } from '../types';
 
-export const ROAD_WIDTH = 11;
+export const DEFAULT_ROAD_WIDTH = 11;
+export const ROAD_WIDTH = DEFAULT_ROAD_WIDTH;
 export const DRIVABLE_HALF_WIDTH = ROAD_WIDTH / 2;
 export const PROTECTED_ROAD_HALF_WIDTH = DRIVABLE_HALF_WIDTH + 0.35;
 export const CAR_COLLISION_RADIUS = 0.9;
@@ -8,6 +9,37 @@ export const BASE_GUARDRAIL_BOUNDARY = DRIVABLE_HALF_WIDTH + 2.35 - 0.45 - CAR_C
 export const PIT_WALL_BOUNDARY = DRIVABLE_HALF_WIDTH + 1.6 - 0.3 - CAR_COLLISION_RADIUS;
 export const APEX_MARKER_BOUNDARY = DRIVABLE_HALF_WIDTH + 1.55 - 0.42 - CAR_COLLISION_RADIUS;
 export const OFF_TRACK_SLOWDOWN_START = 4.8;
+export const DEFAULT_STEERING_ASSIST_MODE: SteeringAssistMode = 'reduced';
+export const DEFAULT_STEERING_ASSIST_STRENGTH = 0.34;
+export const DEFAULT_LANE_CENTERING_STRENGTH = 0.22;
+
+export interface LateralRange {
+  min: number;
+  max: number;
+}
+
+export interface TrackSpaceProfile {
+  trackId: string;
+  roadWidth: number;
+  drivableHalfWidth: number;
+  protectedHalfWidth: number;
+  usablePassingWidth: number;
+  estimatedLaneCount: number;
+  playerLateralRange: LateralRange;
+  cpuLateralRange: LateralRange;
+  startingGridLateralSpread: number;
+  trackEdgeBoundary: number;
+  pitWallBoundary: number;
+  apexMarkerBoundary: number;
+  tireWallBoundary: number;
+  offTrackSlowdownStart: number;
+}
+
+export interface DrivingAssistSettings {
+  steeringAssistMode: SteeringAssistMode;
+  steeringAssistStrength: number;
+  laneCenteringStrength: number;
+}
 
 export type TrackCollisionKind = 'guardrail' | 'pit_wall' | 'apex_marker' | 'tire_wall';
 export type TrackCollisionSide = -1 | 1 | 'both';
@@ -29,6 +61,7 @@ export interface TrackCollisionProfile {
   trackId: string;
   roadHalfWidth: number;
   protectedHalfWidth: number;
+  trackSpace: TrackSpaceProfile;
   zones: TrackCollisionZone[];
 }
 
@@ -44,7 +77,44 @@ export interface TrackSpaceCollision {
   tireScale: number;
 }
 
+export function createTrackSpaceProfile(track: TrackDefinition): TrackSpaceProfile {
+  const roadWidth = Math.max(8, track.roadWidth ?? DEFAULT_ROAD_WIDTH);
+  const drivableHalfWidth = roadWidth / 2;
+  const protectedHalfWidth = drivableHalfWidth + 0.35;
+  const playerLimit = Math.max(3.8, drivableHalfWidth - 1);
+  const cpuLimit = Math.max(3.5, drivableHalfWidth - 1.25);
+  const usablePassingWidth = round(playerLimit * 2);
+  return {
+    trackId: track.id,
+    roadWidth,
+    drivableHalfWidth,
+    protectedHalfWidth,
+    usablePassingWidth,
+    estimatedLaneCount: Math.max(1, Math.floor(usablePassingWidth / 4)),
+    playerLateralRange: { min: round(-playerLimit), max: round(playerLimit) },
+    cpuLateralRange: { min: round(-cpuLimit), max: round(cpuLimit) },
+    startingGridLateralSpread: round(Math.min(playerLimit * 1.75, 9.2)),
+    trackEdgeBoundary: round(drivableHalfWidth + 2.35 - 0.45 - CAR_COLLISION_RADIUS),
+    pitWallBoundary: round(drivableHalfWidth + 1.6 - 0.3 - CAR_COLLISION_RADIUS),
+    apexMarkerBoundary: round(drivableHalfWidth + 1.55 - 0.42 - CAR_COLLISION_RADIUS),
+    tireWallBoundary: round(drivableHalfWidth + 6 - 0.78 - CAR_COLLISION_RADIUS),
+    offTrackSlowdownStart: round(Math.max(4.8, drivableHalfWidth - 0.7)),
+  };
+}
+
+export function resolveDrivingAssistSettings(settings?: Partial<Pick<GameSettings, 'steeringAssistMode' | 'steeringAssistStrength' | 'laneCenteringStrength'>>): DrivingAssistSettings {
+  const steeringAssistMode = settings?.steeringAssistMode ?? DEFAULT_STEERING_ASSIST_MODE;
+  const modeStrength = steeringAssistMode === 'arcade' ? 0.72 : steeringAssistMode === 'reduced' ? DEFAULT_STEERING_ASSIST_STRENGTH : 0;
+  const modeCentering = steeringAssistMode === 'arcade' ? 0.78 : steeringAssistMode === 'reduced' ? DEFAULT_LANE_CENTERING_STRENGTH : 0;
+  return {
+    steeringAssistMode,
+    steeringAssistStrength: clamp(settings?.steeringAssistStrength ?? modeStrength, 0, 1),
+    laneCenteringStrength: clamp(settings?.laneCenteringStrength ?? modeCentering, 0, 1.6),
+  };
+}
+
 export function createTrackCollisionProfile(track: TrackDefinition): TrackCollisionProfile {
+  const trackSpace = createTrackSpaceProfile(track);
   const zones: TrackCollisionZone[] = [
     {
       kind: 'guardrail',
@@ -52,7 +122,7 @@ export function createTrackCollisionProfile(track: TrackDefinition): TrackCollis
       start: 0,
       end: 1,
       side: 'both',
-      boundary: BASE_GUARDRAIL_BOUNDARY,
+      boundary: trackSpace.trackEdgeBoundary,
       severityMultiplier: 0.82,
       speedLoss: 0.34,
       damageScale: 0.1,
@@ -67,7 +137,7 @@ export function createTrackCollisionProfile(track: TrackDefinition): TrackCollis
       start,
       end,
       side: 'both',
-      boundary: DRIVABLE_HALF_WIDTH + 6 - 0.78 - CAR_COLLISION_RADIUS,
+      boundary: trackSpace.tireWallBoundary,
       severityMultiplier: 1,
       speedLoss: 0.42,
       damageScale: 0.13,
@@ -82,7 +152,7 @@ export function createTrackCollisionProfile(track: TrackDefinition): TrackCollis
       start: apex.kerb[0],
       end: apex.kerb[1],
       side: apex.side,
-      boundary: APEX_MARKER_BOUNDARY,
+      boundary: trackSpace.apexMarkerBoundary,
       severityMultiplier: 0.72,
       speedLoss: 0.22,
       damageScale: 0.055,
@@ -97,7 +167,7 @@ export function createTrackCollisionProfile(track: TrackDefinition): TrackCollis
       start: 0.895,
       end: 0.985,
       side: 1,
-      boundary: PIT_WALL_BOUNDARY,
+      boundary: trackSpace.pitWallBoundary,
       severityMultiplier: 1.08,
       speedLoss: 0.46,
       damageScale: 0.16,
@@ -107,8 +177,9 @@ export function createTrackCollisionProfile(track: TrackDefinition): TrackCollis
 
   return {
     trackId: track.id,
-    roadHalfWidth: DRIVABLE_HALF_WIDTH,
-    protectedHalfWidth: PROTECTED_ROAD_HALF_WIDTH,
+    roadHalfWidth: trackSpace.drivableHalfWidth,
+    protectedHalfWidth: trackSpace.protectedHalfWidth,
+    trackSpace,
     zones,
   };
 }

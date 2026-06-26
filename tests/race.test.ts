@@ -14,9 +14,9 @@ import { createPositionCommentary, createSpotterCommentary, pickActiveRaceEvent 
 import { createTrackMapLayout, summarizeRaceReadability } from '../src/game/raceReadability';
 import { applyCampaignResults, createCampaignObjective, createCampaignScores, evaluateCampaignObjective } from '../src/game/campaign';
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
-import { buildRaceScene, createPodiumCeremony, DRIVABLE_HALF_WIDTH, validateTrackEnvironment, type EnvironmentCategory, type SceneDetailLevel } from '../src/game/scene';
+import { buildRaceScene, createPodiumCeremony, validateTrackEnvironment, type EnvironmentCategory, type SceneDetailLevel } from '../src/game/scene';
 import { TrackPath } from '../src/game/trackPath';
-import { PIT_WALL_BOUNDARY, createTrackCollisionProfile, resolveTrackSpaceCollision } from '../src/game/trackSpace';
+import { createTrackCollisionProfile, createTrackSpaceProfile, resolveTrackSpaceCollision } from '../src/game/trackSpace';
 import { animateDriverIdle, createFormulaCar, summarizeDriverRig } from '../src/game/models';
 import { createFormulaAssetManager } from '../src/game/formulaAssets';
 import { createFinaleCommentary, createRacePodiumCommentary } from '../src/game/podiumCommentary';
@@ -188,13 +188,43 @@ describe('track data', () => {
     expect(report.tracksidePropCount).toBeGreaterThanOrEqual(80);
     expect(report.landmarkCount).toBeGreaterThanOrEqual(1);
     expect(report.estimatedDetailScore).toBeGreaterThanOrEqual(80);
+    expect(report).toMatchObject({
+      roadWidth: 16,
+      drivableHalfWidth: 8,
+      usablePassingWidth: expect.any(Number),
+      estimatedLaneCount: expect.any(Number),
+      steeringAssistMode: 'reduced',
+    });
+    expect(report.roadWidth).toBeGreaterThanOrEqual(15);
+    expect(report.usablePassingWidth).toBeGreaterThanOrEqual(12);
+    expect(report.estimatedLaneCount).toBeGreaterThanOrEqual(3);
+    expect(report.playerLateralRange.max).toBeGreaterThanOrEqual(6.2);
+    expect(report.cpuLateralRange.max).toBeGreaterThanOrEqual(5.8);
+    expect(report.autoCenteringStrength).toBeLessThanOrEqual(0.45);
+  });
+
+  it('derives Marina Vista passing room and collision boundaries from track road width', () => {
+    const marina = tracks.find((track) => track.id === 'marina')!;
+    const profile = createTrackSpaceProfile(marina);
+    const defaultProfile = createTrackSpaceProfile(tracks.find((track) => track.id === 'silverpine')!);
+
+    expect(marina.roadWidth).toBe(16);
+    expect(profile.roadWidth).toBeGreaterThanOrEqual(15);
+    expect(profile.drivableHalfWidth).toBe(8);
+    expect(profile.usablePassingWidth).toBeGreaterThanOrEqual(12);
+    expect(profile.estimatedLaneCount).toBeGreaterThanOrEqual(3);
+    expect(profile.playerLateralRange.max).toBeGreaterThan(defaultProfile.playerLateralRange.max);
+    expect(profile.cpuLateralRange.max).toBeGreaterThan(defaultProfile.cpuLateralRange.max);
+    expect(profile.trackEdgeBoundary).toBeGreaterThan(defaultProfile.trackEdgeBoundary);
+    expect(profile.pitWallBoundary).toBeGreaterThan(defaultProfile.pitWallBoundary);
   });
 
   it('rejects trackside footprints that overlap the protected road zone even when centers are outside asphalt', () => {
     const marina = tracks.find((track) => track.id === 'marina')!;
     const path = new TrackPath(marina);
+    const profile = createTrackSpaceProfile(marina);
     const scene = new THREE.Scene();
-    const pose = path.poseAt(0.24, DRIVABLE_HALF_WIDTH + 0.1);
+    const pose = path.poseAt(0.24, profile.drivableHalfWidth + 0.1);
     const guardrail = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial());
     guardrail.name = 'test-overlapping-guardrail';
     guardrail.position.copy(pose.position);
@@ -241,6 +271,7 @@ describe('track data', () => {
   it('allows shallow curb edge overlap but rejects curbs placed deep inside the road', () => {
     const marina = tracks.find((track) => track.id === 'marina')!;
     const path = new TrackPath(marina);
+    const profile = createTrackSpaceProfile(marina);
     const curbRadius = 0.36;
     const createCurbReport = (lateralOffset: number) => {
       const scene = new THREE.Scene();
@@ -254,8 +285,8 @@ describe('track data', () => {
       return validateTrackEnvironment(scene, path, marina);
     };
 
-    const legalEdgeReport = createCurbReport(DRIVABLE_HALF_WIDTH + curbRadius - 0.18);
-    const deepIntrusionReport = createCurbReport(DRIVABLE_HALF_WIDTH - 0.2);
+    const legalEdgeReport = createCurbReport(profile.drivableHalfWidth + curbRadius - 0.18);
+    const deepIntrusionReport = createCurbReport(profile.drivableHalfWidth - 0.2);
 
     expect(legalEdgeReport.curbIntrusionCount).toBe(0);
     expect(deepIntrusionReport.curbIntrusionCount).toBe(1);
@@ -268,16 +299,17 @@ describe('track data', () => {
   it('builds side-aware track-space collision zones from circuit infrastructure', () => {
     const marina = tracks.find((track) => track.id === 'marina')!;
     const profile = createTrackCollisionProfile(marina);
-    const pitWall = resolveTrackSpaceCollision(profile, 0.92, PIT_WALL_BOUNDARY + 0.5, 52);
-    const clearOppositeSide = resolveTrackSpaceCollision(profile, 0.92, -(TRACK_EDGE_BOUNDARY + 0.2), 52);
-    const apexMarker = resolveTrackSpaceCollision(profile, 0.16, DRIVABLE_HALF_WIDTH + 0.8, 48);
+    const trackSpace = createTrackSpaceProfile(marina);
+    const pitWall = resolveTrackSpaceCollision(profile, 0.92, trackSpace.pitWallBoundary + 0.5, 52);
+    const clearOppositeSide = resolveTrackSpaceCollision(profile, 0.92, -(trackSpace.trackEdgeBoundary + 0.2), 52);
+    const apexMarker = resolveTrackSpaceCollision(profile, 0.16, trackSpace.drivableHalfWidth + 0.8, 48);
 
     expect(profile.zones.some((zone) => zone.kind === 'guardrail')).toBe(true);
     expect(profile.zones.some((zone) => zone.kind === 'pit_wall')).toBe(true);
     expect(pitWall).toMatchObject({
       kind: 'pit_wall',
       side: 1,
-      boundary: PIT_WALL_BOUNDARY,
+      boundary: trackSpace.pitWallBoundary,
     });
     expect(clearOppositeSide?.kind).toBe('guardrail');
     expect(apexMarker?.kind).toBe('apex_marker');
@@ -790,6 +822,27 @@ describe('race simulation', () => {
     expect(snapshot.player.finished).toBe(false);
   });
 
+  it('lets the player steer into and briefly hold an off-center Marina lane without snap-centering', () => {
+    const marina = tracks.find((track) => track.id === 'marina')!;
+    const racers = [{ ...playerTemplate, name: settings.playerName }];
+    const race = createRace('timeAttack', marina, racers, settings);
+    let snapshot = race.snapshot();
+    for (let i = 0; i < 45; i += 1) {
+      snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: 1 });
+    }
+    const steeredLateral = snapshot.player.lateral;
+    expect(steeredLateral).toBeGreaterThan(1.8);
+    expect(snapshot.player.lateralVelocity).toBeGreaterThan(0);
+
+    for (let i = 0; i < 45; i += 1) {
+      snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: 0 });
+    }
+
+    expect(snapshot.player.lateral).toBeGreaterThan(1.2);
+    expect(snapshot.player.lateral).toBeGreaterThan(steeredLateral * 0.45);
+    expect(Math.abs(snapshot.player.lateral)).toBeLessThanOrEqual(createTrackSpaceProfile(marina).playerLateralRange.max + 1.4);
+  });
+
   it('clamps and slows cars that hit the track-space guardrail boundary', () => {
     const racers = [{ ...playerTemplate, name: settings.playerName }];
     const race = createRace('timeAttack', tracks[0], racers, settings);
@@ -800,7 +853,7 @@ describe('race simulation', () => {
 
     const snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: 1 });
 
-    expect(Math.abs(snapshot.player.lateral)).toBeLessThanOrEqual(TRACK_EDGE_BOUNDARY);
+    expect(Math.abs(snapshot.player.lateral)).toBeLessThanOrEqual(TRACK_EDGE_BOUNDARY + 0.001);
     expect(snapshot.player.speed).toBeLessThan(64);
     expect(snapshot.player.damage).toBeLessThan(1);
     expect(snapshot.player.trackContactEvents).toBe(1);
@@ -809,23 +862,57 @@ describe('race simulation', () => {
     expect(snapshot.player.contactEvents).toBe(0);
   });
 
+  it('clamps edge contact without recentering the player to zero', () => {
+    const marina = tracks.find((track) => track.id === 'marina')!;
+    const trackSpace = createTrackSpaceProfile(marina);
+    const racers = [{ ...playerTemplate, name: settings.playerName }];
+    const race = createRace('timeAttack', marina, racers, settings);
+    const initial = race.snapshot();
+    initial.player.progress = 0.5;
+    initial.player.lateral = trackSpace.trackEdgeBoundary + 1.1;
+    initial.player.lateralVelocity = 5.2;
+    initial.player.speed = 62;
+
+    const snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: 0 });
+
+    expect(snapshot.player.lateral).toBeGreaterThan(trackSpace.playerLateralRange.max);
+    expect(snapshot.player.lateral).toBeLessThanOrEqual(trackSpace.trackEdgeBoundary);
+    expect(snapshot.player.lateral).toBeGreaterThan(0);
+    expect(snapshot.player.trackContactEvents).toBe(1);
+    expect(snapshot.player.lastTrackContactKind).toBe('guardrail');
+  });
+
   it('uses Marina pit-wall track-space collision before the general guardrail limit', () => {
     const marina = tracks.find((track) => track.id === 'marina')!;
+    const trackSpace = createTrackSpaceProfile(marina);
     const racers = [{ ...playerTemplate, name: settings.playerName }];
     const race = createRace('timeAttack', marina, racers, settings);
     const initial = race.snapshot();
     initial.player.progress = 0.92;
-    initial.player.lateral = PIT_WALL_BOUNDARY + 0.75;
+    initial.player.lateral = trackSpace.pitWallBoundary + 0.75;
     initial.player.speed = 58;
     initial.player.damage = 1;
 
     const snapshot = race.update(1 / 30, { throttle: true, brake: false, steer: 1 });
 
-    expect(snapshot.player.lateral).toBeLessThanOrEqual(PIT_WALL_BOUNDARY);
+    expect(snapshot.player.lateral).toBeLessThanOrEqual(trackSpace.pitWallBoundary);
     expect(snapshot.player.lastTrackContactKind).toBe('pit_wall');
     expect(snapshot.player.trackContactEvents).toBe(1);
     expect(snapshot.player.speed).toBeLessThan(58);
     expect(snapshot.player.damage).toBeLessThan(1);
+  });
+
+  it('allows CPU cars to target at least three Marina passing lanes', () => {
+    const marina = tracks.find((track) => track.id === 'marina')!;
+    const profile = createTrackSpaceProfile(marina);
+    const base = createRace('timeAttack', marina, [{ ...playerTemplate, name: settings.playerName }, ...cpuRacers], settings).snapshot().racers;
+    const targets = base.slice(1, 7).map((racer, index) => analyzeCpuRacecraft(racer, index + 1, base, marina).targetLateral);
+    const roundedLaneBands = new Set(targets.map((value) => Math.round(value / 2)));
+
+    expect(profile.estimatedLaneCount).toBeGreaterThanOrEqual(3);
+    expect(Math.max(...targets)).toBeGreaterThan(2);
+    expect(Math.min(...targets)).toBeLessThan(-2);
+    expect(roundedLaneBands.size).toBeGreaterThanOrEqual(3);
   });
 
   it('requires a plausible driven lap before completing time attack', () => {

@@ -43,6 +43,7 @@ export const tracks: TrackDefinition[] = [
     difficulty: 3,
     scenery: 'harbor',
     palette: { ground: 0x4aa3a2, road: 0x23262d, accent: 0xfff0c2, sky: 0xbce8ff },
+    roadWidth: 16,
     points: [[0, -108], [54, -118], [112, -86], [104, -28], [146, 18], [112, 74], [38, 88], [-18, 130], [-84, 92], [-128, 18], [-86, -30], [-116, -86], [-44, -126]],
     kerbZones: [[0.1, 0.22], [0.35, 0.46], [0.59, 0.7], [0.82, 0.92]],
     landmarks: [

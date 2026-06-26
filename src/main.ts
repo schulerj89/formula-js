@@ -803,7 +803,8 @@ function updateCars(snapshot: RaceSnapshot): void {
     const pose = sceneBuild.path.poseAt(state.progress, state.lateral);
     car.position.copy(pose.position);
     car.position.y = 0.2;
-    car.rotation.y = pose.yaw - state.lateral * 0.015;
+    car.rotation.y = pose.yaw + state.visualYawOffset;
+    car.rotation.z = state.visualRoll;
     animateDriverIdle(car, elapsed);
     const wheelSpin = state.speed * elapsed * 0.6;
     cachedCarWheels(car).forEach((wheel) => {
@@ -1401,7 +1402,8 @@ function updateReplayPlayback(dt: number): void {
     const pose = sceneBuild.path.poseAt(racer.progress, racer.lateral);
     car.position.copy(pose.position);
     car.position.y = 0.2;
-    car.rotation.y = pose.yaw - racer.lateral * 0.015;
+    car.rotation.y = pose.yaw;
+    car.rotation.z = 0;
     animateDriverIdle(car, performance.now() * 0.001);
   }
   const focus = frame.racers.find((racer) => racer.id === replayFocusRacerId) ?? frame.racers[0];
@@ -1699,6 +1701,14 @@ function buildDebugMetrics() {
       goLabel: goPedal.textContent,
       goAriaLabel: goPedal.getAttribute('aria-label'),
     },
+    playerTrackSpace: latestSnapshot
+      ? {
+          lateral: Math.round(latestSnapshot.player.lateral * 1000) / 1000,
+          lateralVelocity: Math.round(latestSnapshot.player.lateralVelocity * 1000) / 1000,
+          visualYawOffset: Math.round(latestSnapshot.player.visualYawOffset * 1000) / 1000,
+          visualRoll: Math.round(latestSnapshot.player.visualRoll * 1000) / 1000,
+        }
+      : null,
     playerHandling: latestSnapshot?.player.handling ?? null,
     cpuRacecraft,
     contact: {

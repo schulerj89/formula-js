@@ -1,11 +1,15 @@
 import type { GameMode, GameSettings, RacerDefinition, RaceResult, TrackDefinition } from '../types';
 import {
   BASE_GUARDRAIL_BOUNDARY,
-  OFF_TRACK_SLOWDOWN_START,
+  DEFAULT_LANE_CENTERING_STRENGTH,
   createTrackCollisionProfile,
+  createTrackSpaceProfile,
   resolveTrackSpaceCollision,
+  resolveDrivingAssistSettings,
+  type DrivingAssistSettings,
   type TrackCollisionKind,
   type TrackCollisionProfile,
+  type TrackSpaceProfile,
 } from './trackSpace';
 
 export interface RacerState {
@@ -15,6 +19,7 @@ export interface RacerState {
   lap: number;
   speed: number;
   lateral: number;
+  lateralVelocity: number;
   totalTime: number;
   bestLap: number;
   currentLapTime: number;
@@ -33,6 +38,8 @@ export interface RacerState {
   lastTrackContactKind: TrackCollisionKind | null;
   lastTrackContactSide: -1 | 1 | null;
   lastTrackContactSeverity: number;
+  visualYawOffset: number;
+  visualRoll: number;
   handling: PlayerHandling;
 }
 
@@ -51,6 +58,7 @@ export interface PlayerHandling {
   steeringResponse: number;
   brakingDemand: number;
   understeer: number;
+  assistCentering: number;
 }
 
 export interface RaceControl {
@@ -77,13 +85,16 @@ export function createRace(
 ): { update: (dt: number, control: RaceControl) => RaceSnapshot; snapshot: () => RaceSnapshot } {
   const laps = mode === 'timeAttack' ? 1 : track.laps;
   const collisionProfile = createTrackCollisionProfile(track);
+  const trackSpace = collisionProfile.trackSpace;
+  const assist = resolveDrivingAssistSettings(settings);
   const states: RacerState[] = racers.map((definition, index) => ({
     definition,
     progress: 0.985 - index * 0.006,
     distance: 0,
     lap: 0,
     speed: 0,
-    lateral: (index % 2 === 0 ? -1 : 1) * (1.1 + Math.floor(index / 2) * 1.15),
+    lateral: (index % 2 === 0 ? -1 : 1) * Math.min(trackSpace.playerLateralRange.max - 0.45, 1.25 + Math.floor(index / 2) * Math.min(2.05, trackSpace.startingGridLateralSpread / 4.5)),
+    lateralVelocity: 0,
     totalTime: 0,
     bestLap: Number.POSITIVE_INFINITY,
     currentLapTime: 0,
@@ -102,6 +113,8 @@ export function createRace(
     lastTrackContactKind: null,
     lastTrackContactSide: null,
     lastTrackContactSeverity: 0,
+    visualYawOffset: 0,
+    visualRoll: 0,
     handling: defaultPlayerHandling(),
   }));
   const player = states[0];
@@ -118,9 +131,9 @@ export function createRace(
       state.lastTrackContactSeverity = Math.max(0, state.lastTrackContactSeverity - dt * 1.4);
 
       if (i === 0) {
-        updatePlayer(state, control, dt, settings, track);
+        updatePlayer(state, control, dt, settings, track, trackSpace, assist);
       } else {
-        updateCpu(state, i, dt, track, states);
+        updateCpu(state, i, dt, track, states, trackSpace);
       }
       applyTrackSpaceCollisionResponse(state, dt, settings, collisionProfile, i === 0 ? 1 : 0.65);
 
@@ -140,7 +153,7 @@ export function createRace(
         state.finishTime = state.totalTime;
       }
     }
-    applyCarContacts(states, track, settings);
+    applyCarContacts(states, track, settings, trackSpace);
     for (const state of states) applyTrackSpaceCollisionResponse(state, dt, settings, collisionProfile, 0.45);
 
     return snapshot();
@@ -171,28 +184,47 @@ export function createResults(snapshot: RaceSnapshot): RaceResult[] {
   }));
 }
 
-function updatePlayer(state: RacerState, control: RaceControl, dt: number, settings: GameSettings, track: TrackDefinition): void {
+function updatePlayer(
+  state: RacerState,
+  control: RaceControl,
+  dt: number,
+  settings: GameSettings,
+  track: TrackDefinition,
+  trackSpace: TrackSpaceProfile,
+  assist: DrivingAssistSettings,
+): void {
   const handling = analyzePlayerHandling(state, control, track);
   state.handling = handling;
   const throttle = control.throttle ? 28 * (1 - handling.cornerLoad * 0.1) : 0;
   const brake = control.brake ? 42 * (1 + handling.cornerLoad * 0.12) : 0;
   const cornerDrag = handling.cornerLoad * Math.max(0, state.speed - 44) * (control.brake ? 0.04 : 0.085);
-  const drag = 9 + Math.abs(control.steer) * 4 + handling.understeer * 8 + cornerDrag;
+  const lateralScrub = Math.abs(state.lateralVelocity) * 0.55;
+  const drag = 9 + Math.abs(control.steer) * 2.6 + handling.understeer * 8 + cornerDrag + lateralScrub;
   state.speed += (throttle - brake - drag) * dt;
   state.speed = clamp(state.speed, 0, 82);
-  state.lateral += control.steer * dt * handling.steeringResponse * Math.max(0.25, state.speed / 60);
-  const offTrack = Math.max(0, Math.abs(state.lateral) - OFF_TRACK_SLOWDOWN_START);
+  const speedSteerFactor = clamp(0.42 + state.speed / 95, 0.42, 1.08);
+  const brakeRotationBoost = control.brake ? 1.18 : 1;
+  const steeringAcceleration = control.steer * handling.steeringResponse * 1.18 * speedSteerFactor * brakeRotationBoost;
+  state.lateralVelocity += steeringAcceleration * dt;
+  if (assist.laneCenteringStrength > 0) state.lateralVelocity -= state.lateral * assist.laneCenteringStrength * dt * (0.5 + state.speed / 150);
+  const damping = clamp(1 - dt * (0.82 + assist.steeringAssistStrength * 0.72 + handling.cornerLoad * 0.16), 0.74, 0.99);
+  state.lateralVelocity *= damping;
+  state.lateralVelocity = clamp(state.lateralVelocity, -10.5, 10.5);
+  state.lateral += state.lateralVelocity * dt;
+  state.lateral = clamp(state.lateral, -trackSpace.trackEdgeBoundary - 1.4, trackSpace.trackEdgeBoundary + 1.4);
+  const offTrack = Math.max(0, Math.abs(state.lateral) - trackSpace.offTrackSlowdownStart);
   if (offTrack > 0) {
     state.speed *= 1 - Math.min(0.65, offTrack * dt * 0.7);
     if (settings.realisticDamage) state.damage = Math.max(0, state.damage - offTrack * dt * 0.025);
   }
-  state.lateral *= 1 - dt * 1.6;
   if (settings.realisticTires) {
-    const wear = (0.002 + Math.abs(control.steer) * 0.012 + (control.brake ? 0.01 : 0) + handling.cornerLoad * 0.004 + handling.understeer * 0.012) * dt;
+    const wear = (0.002 + Math.abs(control.steer) * 0.009 + Math.abs(state.lateralVelocity) * 0.002 + (control.brake ? 0.01 : 0) + handling.cornerLoad * 0.004 + handling.understeer * 0.012) * dt;
     state.tires = Math.max(0, state.tires - wear);
   }
   const conditionLimit = 82 * (0.55 + state.damage * 0.45) * (0.72 + state.tires * 0.28);
   state.speed = Math.min(state.speed, conditionLimit);
+  state.visualYawOffset = clamp(control.steer * 0.08 + state.lateralVelocity * 0.028 - handling.understeer * control.steer * 0.06, -0.22, 0.22);
+  state.visualRoll = clamp(-control.steer * 0.035 - state.lateralVelocity * 0.012, -0.12, 0.12);
 }
 
 function applyTrackSpaceCollisionResponse(
@@ -206,6 +238,7 @@ function applyTrackSpaceCollisionResponse(
   if (!collision) return;
   const severity = Math.round(collision.severity * severityScale * 1000) / 1000;
   state.lateral = collision.side * collision.boundary;
+  state.lateralVelocity = -collision.side * Math.min(Math.abs(state.lateralVelocity) * 0.32 + severity * 1.25, 4.2);
   state.speed *= 1 - Math.min(0.8, collision.speedLoss + severity * 0.24);
   state.lastTrackContactKind = collision.kind;
   state.lastTrackContactSide = collision.side;
@@ -216,6 +249,8 @@ function applyTrackSpaceCollisionResponse(
   }
   if (settings.realisticDamage) state.damage = Math.max(0, state.damage - severity * dt * collision.damageScale);
   if (settings.realisticTires) state.tires = Math.max(0, state.tires - severity * dt * collision.tireScale);
+  state.visualYawOffset = clamp(state.visualYawOffset - collision.side * severity * 0.08, -0.22, 0.22);
+  state.visualRoll = clamp(state.visualRoll + collision.side * severity * 0.05, -0.12, 0.12);
 }
 
 export function analyzePlayerHandling(
@@ -223,11 +258,13 @@ export function analyzePlayerHandling(
   control: RaceControl,
   track: TrackDefinition,
 ): PlayerHandling {
+  const trackSpace = createTrackSpaceProfile(track);
+  const assist = resolveDrivingAssistSettings();
   const cornerLoad = cornerPressure(state.progress, track);
   const speedLoad = clamp((state.speed - 34) / 48, 0, 1);
   const steeringLoad = Math.abs(control.steer);
   const conditionGrip = 0.6 + clamp(state.tires, 0, 1) * 0.27 + clamp(state.damage, 0, 1) * 0.13;
-  const lateralLoad = clamp(Math.abs(state.lateral) / 5.2, 0, 1);
+  const lateralLoad = clamp(Math.abs(state.lateral) / trackSpace.playerLateralRange.max, 0, 1);
   const brakingDemand = clamp(cornerLoad * speedLoad * (control.brake ? 0.55 : control.throttle ? 1 : 0.78), 0, 1);
   const grip = clamp(conditionGrip - cornerLoad * 0.18 - speedLoad * steeringLoad * 0.14 - lateralLoad * 0.08, 0.44, 1);
   const understeer = clamp(brakingDemand * steeringLoad - grip * 0.46, 0, 1);
@@ -238,29 +275,37 @@ export function analyzePlayerHandling(
     steeringResponse: Math.round(steeringResponse * 1000) / 1000,
     brakingDemand: Math.round(brakingDemand * 1000) / 1000,
     understeer: Math.round(understeer * 1000) / 1000,
+    assistCentering: assist.laneCenteringStrength,
   };
 }
 
-function updateCpu(state: RacerState, index: number, dt: number, track: TrackDefinition, states: RacerState[]): void {
+function updateCpu(state: RacerState, index: number, dt: number, track: TrackDefinition, states: RacerState[], trackSpace: TrackSpaceProfile): void {
   const racecraft = analyzeCpuRacecraft(state, index, states, track);
   state.racecraft = racecraft;
   const speedResponse = racecraft.braking ? 1.55 : 0.72;
   state.speed += (racecraft.targetSpeed - state.speed) * dt * speedResponse;
   state.speed = clamp(state.speed, 0, 84);
   const lateralResponse = Math.min(1, dt * (racecraft.overtakeLane ? 2.6 : 1.8));
+  const previousLateral = state.lateral;
   state.lateral += (racecraft.targetLateral - state.lateral) * lateralResponse;
-  const lateralLoad = Math.abs(state.lateral) / 4.8;
+  state.lateral = clamp(state.lateral, trackSpace.cpuLateralRange.min, trackSpace.cpuLateralRange.max);
+  state.lateralVelocity = (state.lateral - previousLateral) / Math.max(0.001, dt);
+  const lateralLoad = Math.abs(state.lateral) / trackSpace.cpuLateralRange.max;
   state.tires = Math.max(0.15, state.tires - dt * (0.0007 + racecraft.cornerLoad * 0.0012 + lateralLoad * 0.0005));
-  if (Math.abs(state.lateral) > 4.8) state.damage = Math.max(0.35, state.damage - dt * 0.01);
+  if (Math.abs(state.lateral) > trackSpace.offTrackSlowdownStart) state.damage = Math.max(0.35, state.damage - dt * 0.01);
+  state.visualYawOffset = clamp(state.lateralVelocity * 0.018 + racecraft.overtakeLane * 0.035, -0.16, 0.16);
+  state.visualRoll = clamp(-state.lateralVelocity * 0.008, -0.08, 0.08);
 }
 
 export function analyzeCpuRacecraft(state: RacerState, index: number, states: RacerState[], track: TrackDefinition): CpuRacecraft {
+  const trackSpace = createTrackSpaceProfile(track);
   const cornerLoad = cornerPressure(state.progress, track);
   const baseSpeed = 50 + state.definition.skill * 18 + track.difficulty * 1.6;
   const cornerSpeedLoss = cornerLoad * (14 + track.difficulty * 2.4);
-  const lane = ((index % 3) - 1) * 1.05;
+  const laneSpacing = Math.min(2.35, trackSpace.cpuLateralRange.max / 2.6);
+  const lane = ((index % 3) - 1) * laneSpacing;
   const cornerSide = index % 2 === 0 ? -1 : 1;
-  let targetLateral = lane * (1 - cornerLoad) + cornerSide * 2.65 * cornerLoad;
+  let targetLateral = lane * (1 - cornerLoad) + cornerSide * trackSpace.cpuLateralRange.max * 0.55 * cornerLoad;
   let targetSpeed = baseSpeed - cornerSpeedLoss;
   let overtakeLane: -1 | 0 | 1 = 0;
   let trafficGapMeters: number | null = null;
@@ -268,13 +313,14 @@ export function analyzeCpuRacecraft(state: RacerState, index: number, states: Ra
   if (traffic && traffic.gapMeters < 82 && state.definition.skill >= traffic.racer.definition.skill - 0.05) {
     overtakeLane = index % 2 === 0 ? 1 : -1;
     trafficGapMeters = traffic.gapMeters;
-    targetLateral += overtakeLane * (1.25 + (82 - traffic.gapMeters) / 82);
+    const overtakeTarget = overtakeLane * Math.max(2.2, trackSpace.cpuLateralRange.max * 0.58);
+    targetLateral = targetLateral * 0.55 + overtakeTarget + overtakeLane * ((82 - traffic.gapMeters) / 82) * 0.75;
     targetSpeed += 4.5;
   }
   targetSpeed *= 0.82 + state.tires * 0.18;
   return {
     targetSpeed: clamp(targetSpeed, 32, 82),
-    targetLateral: clamp(targetLateral, -4.25, 4.25),
+    targetLateral: clamp(targetLateral, trackSpace.cpuLateralRange.min, trackSpace.cpuLateralRange.max),
     cornerLoad,
     braking: cornerLoad > 0.58 && state.speed > targetSpeed + 1.5,
     overtakeLane,
@@ -323,7 +369,7 @@ export function analyzeCarContact(a: RacerState, b: RacerState, trackLengthKm: n
   };
 }
 
-function applyCarContacts(states: RacerState[], track: TrackDefinition, settings: GameSettings): void {
+function applyCarContacts(states: RacerState[], track: TrackDefinition, settings: GameSettings, trackSpace: TrackSpaceProfile): void {
   for (let aIndex = 0; aIndex < states.length; aIndex += 1) {
     const a = states[aIndex];
     if (a.finished) continue;
@@ -332,15 +378,19 @@ function applyCarContacts(states: RacerState[], track: TrackDefinition, settings
       if (b.finished || a.contactCooldown > 0 || b.contactCooldown > 0) continue;
       const contact = analyzeCarContact(a, b, track.lengthKm);
       if (!contact.overlap) continue;
-      applyContactToPair(a, b, contact.severity, settings);
+      applyContactToPair(a, b, contact.severity, settings, trackSpace);
     }
   }
 }
 
-function applyContactToPair(a: RacerState, b: RacerState, severity: number, settings: GameSettings): void {
+function applyContactToPair(a: RacerState, b: RacerState, severity: number, settings: GameSettings, trackSpace: TrackSpaceProfile): void {
   const pushDirection = a.lateral <= b.lateral ? -1 : 1;
-  a.lateral = clamp(a.lateral + pushDirection * severity * 0.72, -5.4, 5.4);
-  b.lateral = clamp(b.lateral - pushDirection * severity * 0.72, -5.4, 5.4);
+  const previousA = a.lateral;
+  const previousB = b.lateral;
+  a.lateral = clamp(a.lateral + pushDirection * severity * 0.72, -trackSpace.trackEdgeBoundary, trackSpace.trackEdgeBoundary);
+  b.lateral = clamp(b.lateral - pushDirection * severity * 0.72, -trackSpace.trackEdgeBoundary, trackSpace.trackEdgeBoundary);
+  a.lateralVelocity = a.lateral - previousA;
+  b.lateralVelocity = b.lateral - previousB;
   const faster = a.speed >= b.speed ? a : b;
   const slower = faster === a ? b : a;
   faster.speed *= 1 - severity * 0.18;
@@ -389,6 +439,7 @@ function defaultPlayerHandling(): PlayerHandling {
     steeringResponse: 8,
     brakingDemand: 0,
     understeer: 0,
+    assistCentering: DEFAULT_LANE_CENTERING_STRENGTH,
   };
 }
 

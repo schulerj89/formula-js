@@ -2,6 +2,7 @@ export type GameMode = 'campaign' | 'timeAttack';
 export type GameState = 'menu' | 'setup' | 'tutorial' | 'prerace' | 'race' | 'podium' | 'replay' | 'finale';
 export type ControlMode = 'holdToGo' | 'splitPedals';
 export type PerformanceMode = 'balanced' | 'highDetail' | 'battery';
+export type SteeringAssistMode = 'arcade' | 'reduced' | 'off';
 
 export interface TrackDefinition {
   id: string;
@@ -17,6 +18,7 @@ export interface TrackDefinition {
     accent: number;
     sky: number;
   };
+  roadWidth?: number;
   points: Array<[number, number]>;
   kerbZones: Array<[number, number]>;
   landmarks: Array<{ label: string; at: number; kind: 'tower' | 'bridge' | 'grandstand' | 'tunnel' }>;
@@ -54,4 +56,7 @@ export interface GameSettings {
   leaderboard: boolean;
   bodyPaint: string;
   helmetPaint: string;
+  steeringAssistMode?: SteeringAssistMode;
+  steeringAssistStrength?: number;
+  laneCenteringStrength?: number;
 }

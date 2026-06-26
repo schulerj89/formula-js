@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import type { RacerDefinition, TrackDefinition } from '../types';
 import { createFormulaCar } from './models';
 import { TrackPath } from './trackPath';
-import { DRIVABLE_HALF_WIDTH, PROTECTED_ROAD_HALF_WIDTH, ROAD_WIDTH } from './trackSpace';
-export { DRIVABLE_HALF_WIDTH, PROTECTED_ROAD_HALF_WIDTH, ROAD_WIDTH } from './trackSpace';
+import { createTrackSpaceProfile, resolveDrivingAssistSettings, type TrackSpaceProfile } from './trackSpace';
+export { DRIVABLE_HALF_WIDTH, PROTECTED_ROAD_HALF_WIDTH, ROAD_WIDTH, createTrackSpaceProfile } from './trackSpace';
 
 export interface SceneBuild {
   path: TrackPath;
@@ -14,6 +14,16 @@ export interface SceneBuild {
 
 export interface EnvironmentValidationReport {
   trackId: string;
+  roadWidth: number;
+  drivableHalfWidth: number;
+  usablePassingWidth: number;
+  estimatedLaneCount: number;
+  playerLateralRange: { min: number; max: number };
+  cpuLateralRange: { min: number; max: number };
+  startingGridLateralSpread: number;
+  trackEdgeBoundary: number;
+  autoCenteringStrength: number;
+  steeringAssistMode: string;
   curbCount: number;
   guardrailCount: number;
   tireWallCount: number;
@@ -151,6 +161,7 @@ export function buildRaceScene(
   scene.add(sun);
 
   const path = new TrackPath(track);
+  const trackSpace = createTrackSpaceProfile(track);
   scene.add(createGround(track));
   scene.add(createTrackRoad(path, track, detailLevel));
   const kerbs = createTrackCurbs(path, track, detailLevel);
@@ -166,7 +177,9 @@ export function buildRaceScene(
   racers.forEach((racer, index) => {
     const car = carFactory(racer);
     car.position.y = 0.2;
-    const pose = path.poseAt(0.985 - index * 0.006, (index % 2 === 0 ? -1 : 1) * (1.4 + Math.floor(index / 2) * 1.6));
+    const gridLaneStep = Math.min(2.05, trackSpace.startingGridLateralSpread / 4.5);
+    const gridOffset = Math.min(trackSpace.playerLateralRange.max - 0.4, 1.55 + Math.floor(index / 2) * gridLaneStep);
+    const pose = path.poseAt(0.985 - index * 0.006, (index % 2 === 0 ? -1 : 1) * gridOffset);
     car.position.copy(pose.position);
     car.rotation.y = pose.yaw;
     scene.add(car);
@@ -226,6 +239,7 @@ function createGround(track: TrackDefinition): THREE.Mesh {
 }
 
 function createTrackRoad(path: TrackPath, track: TrackDefinition, detailLevel: SceneDetailLevel): THREE.Mesh {
+  const trackSpace = createTrackSpaceProfile(track);
   const segments = detailLevel === 'full' ? 420 : detailLevel === 'balanced' ? 300 : 220;
   const positions: number[] = [];
   const uvs: number[] = [];
@@ -235,8 +249,8 @@ function createTrackRoad(path: TrackPath, track: TrackDefinition, detailLevel: S
     const p = i / segments;
     const center = path.pointAt(p);
     const normal = path.normalAt(p);
-    const left = center.clone().addScaledVector(normal, -DRIVABLE_HALF_WIDTH);
-    const right = center.clone().addScaledVector(normal, DRIVABLE_HALF_WIDTH);
+    const left = center.clone().addScaledVector(normal, -trackSpace.drivableHalfWidth);
+    const right = center.clone().addScaledVector(normal, trackSpace.drivableHalfWidth);
     positions.push(left.x, 0.02, left.z, right.x, 0.02, right.z);
     uvs.push(0, i / 18, 1, i / 18);
     if (i < segments) {
@@ -268,12 +282,13 @@ function createTrackCurbs(
   track: TrackDefinition,
   detailLevel: SceneDetailLevel,
 ): { group: THREE.Group; stats: { visualKerbSegments: number; kerbInstances: number } } {
+  const trackSpace = createTrackSpaceProfile(track);
   const group = new THREE.Group();
   const red = new THREE.MeshLambertMaterial({ color: 0xd62828 });
   const white = new THREE.MeshLambertMaterial({ color: 0xf8f9fa });
   const curbLateralHalfWidth = 0.36;
   const curbEdgeOverlap = 0.18;
-  const curbOffset = DRIVABLE_HALF_WIDTH + curbLateralHalfWidth - curbEdgeOverlap;
+  const curbOffset = trackSpace.drivableHalfWidth + curbLateralHalfWidth - curbEdgeOverlap;
   const geometry = new THREE.BoxGeometry(curbLateralHalfWidth * 2, 0.12, 1.8, 1, 1, 1);
   const redMatrices: THREE.Matrix4[] = [];
   const whiteMatrices: THREE.Matrix4[] = [];
@@ -341,6 +356,7 @@ function createVegetationClusters(path: TrackPath, track: TrackDefinition, detai
   const scale = new THREE.Vector3();
   const quat = new THREE.Quaternion();
   const buildingRadius = 4;
+  const trackSpace = createTrackSpaceProfile(track);
   const trackSegments = createTrackSegments(path);
 
   for (let i = 0; i < treeCount; i += 1) {
@@ -360,7 +376,7 @@ function createVegetationClusters(path: TrackPath, track: TrackDefinition, detai
     const side = i % 2 === 0 ? -1 : 1;
     const pose = path.poseAt(p, side * (58 + (i % 7) * 8));
     scale.set(0.7 + (i % 4) * 0.18, 0.7 + (i % 6) * 0.22, 0.7 + (i % 3) * 0.2);
-    const position = keepOutsideProtectedRoadZone(new THREE.Vector3(pose.position.x, 8 * scale.y, pose.position.z), trackSegments, side, buildingRadius, 1.5);
+    const position = keepOutsideProtectedRoadZone(new THREE.Vector3(pose.position.x, 8 * scale.y, pose.position.z), trackSegments, side, buildingRadius, trackSpace, 1.5);
     matrix.compose(position, quat, scale);
     buildings.setMatrixAt(i, matrix);
   }
@@ -405,6 +421,7 @@ function createLandmarks(path: TrackPath, track: TrackDefinition): THREE.Group {
 }
 
 function createTracksideDetails(path: TrackPath, track: TrackDefinition, detailLevel: SceneDetailLevel): { group: THREE.Group; stats: TracksideDetailStats } {
+  const trackSpace = createTrackSpaceProfile(track);
   const group = new THREE.Group();
   group.name = 'trackside-atmosphere';
 
@@ -419,7 +436,7 @@ function createTracksideDetails(path: TrackPath, track: TrackDefinition, detailL
   for (let i = 0; i < barrierPanels; i += 1) {
     const p = (i % (barrierPanels / 2)) / (barrierPanels / 2);
     const side = i < barrierPanels / 2 ? -1 : 1;
-    const pose = path.poseAt(p, side * (DRIVABLE_HALF_WIDTH + 2.35));
+    const pose = path.poseAt(p, side * (trackSpace.drivableHalfWidth + 2.35));
     const position = pose.position.clone();
     position.y = 0.48;
     rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw + Math.PI / 2);
@@ -436,7 +453,7 @@ function createTracksideDetails(path: TrackPath, track: TrackDefinition, detailL
   for (let i = 0; i < sponsorBoards; i += 1) {
     const side = i % 2 === 0 ? -1 : 1;
     const p = (0.035 + i * 0.029) % 1;
-    const pose = path.poseAt(p, side * (DRIVABLE_HALF_WIDTH + 9 + (i % 3) * 1.1));
+    const pose = path.poseAt(p, side * (trackSpace.drivableHalfWidth + 9 + (i % 3) * 1.1));
     const position = pose.position.clone();
     position.y = 1.2;
     rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw + Math.PI / 2);
@@ -453,7 +470,7 @@ function createTracksideDetails(path: TrackPath, track: TrackDefinition, detailL
   for (const [start, end] of track.kerbZones) {
     for (let p = start; p < end; p += tireStep) {
       for (const side of [-1, 1]) {
-        const pose = path.poseAt(p, side * (DRIVABLE_HALF_WIDTH + 6));
+        const pose = path.poseAt(p, side * (trackSpace.drivableHalfWidth + 6));
         const position = pose.position.clone();
         position.y = 0.38;
         rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw);
@@ -477,7 +494,7 @@ function createTracksideDetails(path: TrackPath, track: TrackDefinition, detailL
   const pitWallMat = new THREE.MeshLambertMaterial({ color: 0xf3f5f8 });
   const pitWall = new THREE.InstancedMesh(pitWallGeo, pitWallMat, pitWallSegments);
   for (let i = 0; i < pitWallSegments; i += 1) {
-    const pose = path.poseAt(0.895 + i * 0.0045, DRIVABLE_HALF_WIDTH + 1.6);
+    const pose = path.poseAt(0.895 + i * 0.0045, trackSpace.drivableHalfWidth + 1.6);
     const position = pose.position.clone();
     position.y = 0.36;
     rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw + Math.PI / 2);
@@ -492,7 +509,7 @@ function createTracksideDetails(path: TrackPath, track: TrackDefinition, detailL
   const gridMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const gridMarks = new THREE.InstancedMesh(gridGeo, gridMat, startGridMarks);
   for (let i = 0; i < startGridMarks; i += 1) {
-    const lane = i % 2 === 0 ? -1.45 : 1.45;
+    const lane = i % 2 === 0 ? -trackSpace.startingGridLateralSpread / 6 : trackSpace.startingGridLateralSpread / 6;
     const row = Math.floor(i / 2);
     const pose = path.poseAt(0.983 - row * 0.0058, lane);
     const position = pose.position.clone();
@@ -546,7 +563,7 @@ function createTracksideDetails(path: TrackPath, track: TrackDefinition, detailL
         pitWallSegments +
         startGridMarks +
         (track.id === marinaTrackId ? marinaPit.userData.validationCount + tracksideProps.userData.validationCount : 0),
-      validation: emptyEnvironmentValidationReport(track.id),
+      validation: emptyEnvironmentValidationReport(track),
     },
   };
 }
@@ -555,6 +572,7 @@ function createBrakingMarkers(
   path: TrackPath,
   track: TrackDefinition,
 ): { group: THREE.Group; brakeBoardZones: number; brakeBoards: number; brakeBoardPosts: number; apexPosts: number } {
+  const trackSpace = createTrackSpaceProfile(track);
   const group = new THREE.Group();
   group.name = 'braking-markers';
   const boardGeo = new THREE.BoxGeometry(1.35, 1.15, 0.18, 1, 1, 1);
@@ -576,7 +594,7 @@ function createBrakingMarkers(
     const markerSide = brakeZone.side;
     for (const meters of boardDistances) {
       const progress = wrapProgress(brakeZone.at - meters / (track.lengthKm * 1000));
-      const pose = path.poseAt(progress, markerSide * (DRIVABLE_HALF_WIDTH + 5.5));
+      const pose = path.poseAt(progress, markerSide * (trackSpace.drivableHalfWidth + 5.5));
       const position = pose.position.clone();
       position.y = 1.28;
       rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pose.yaw - Math.PI / 2);
@@ -592,7 +610,7 @@ function createBrakingMarkers(
 
   for (const apex of apexMarkers) {
     const apexPose = path.poseAt(apex.at);
-    const apexPosition = apexPose.position.clone().addScaledVector(apexPose.normal, apex.side * (DRIVABLE_HALF_WIDTH + 1.55));
+    const apexPosition = apexPose.position.clone().addScaledVector(apexPose.normal, apex.side * (trackSpace.drivableHalfWidth + 1.55));
     apexPosition.y = 0.7;
     rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), apexPose.yaw);
     matrix.compose(apexPosition, rotation, boardScale);
@@ -667,6 +685,8 @@ function tagForValidation(
 }
 
 export function validateTrackEnvironment(scene: THREE.Object3D, path: TrackPath, track: TrackDefinition): EnvironmentValidationReport {
+  const trackSpace = createTrackSpaceProfile(track);
+  const assist = resolveDrivingAssistSettings();
   const counts = new Map<EnvironmentCategory, number>();
   const floatingObjects: EnvironmentFloatingObject[] = [];
   const roadObstructions: EnvironmentRoadOverlap[] = [];
@@ -688,11 +708,11 @@ export function validateTrackEnvironment(scene: THREE.Object3D, path: TrackPath,
     for (const candidate of candidates) {
       if (category !== 'water_feature' && candidate.position.y < -0.12) floatingObjects.push(createFloatingObject(category, candidate));
       if (category === 'track_curb') {
-        const curbIntrusion = createCurbIntrusion(category, candidate, trackSegments, radius);
+        const curbIntrusion = createCurbIntrusion(category, candidate, trackSegments, radius, trackSpace);
         if (curbIntrusion) curbIntrusions.push(curbIntrusion);
         continue;
       }
-      const roadOverlap = createRoadOverlap(category, candidate, trackSegments, radius, object);
+      const roadOverlap = createRoadOverlap(category, candidate, trackSegments, radius, object, trackSpace);
       if (!roadOverlap) continue;
       roadObstructions.push(roadOverlap);
       if (category === 'guardrail') guardrailIntrusionCount += 1;
@@ -704,6 +724,16 @@ export function validateTrackEnvironment(scene: THREE.Object3D, path: TrackPath,
 
   const report: EnvironmentValidationReport = {
     trackId: track.id,
+    roadWidth: trackSpace.roadWidth,
+    drivableHalfWidth: trackSpace.drivableHalfWidth,
+    usablePassingWidth: trackSpace.usablePassingWidth,
+    estimatedLaneCount: trackSpace.estimatedLaneCount,
+    playerLateralRange: trackSpace.playerLateralRange,
+    cpuLateralRange: trackSpace.cpuLateralRange,
+    startingGridLateralSpread: trackSpace.startingGridLateralSpread,
+    trackEdgeBoundary: trackSpace.trackEdgeBoundary,
+    autoCenteringStrength: assist.laneCenteringStrength,
+    steeringAssistMode: assist.steeringAssistMode,
     curbCount: counts.get('track_curb') ?? 0,
     guardrailCount: counts.get('guardrail') ?? 0,
     tireWallCount: counts.get('tire_wall') ?? 0,
@@ -737,9 +767,21 @@ export function validateTrackEnvironment(scene: THREE.Object3D, path: TrackPath,
   return report;
 }
 
-function emptyEnvironmentValidationReport(trackId: string): EnvironmentValidationReport {
+function emptyEnvironmentValidationReport(track: TrackDefinition): EnvironmentValidationReport {
+  const trackSpace = createTrackSpaceProfile(track);
+  const assist = resolveDrivingAssistSettings();
   const report: EnvironmentValidationReport = {
-    trackId,
+    trackId: track.id,
+    roadWidth: trackSpace.roadWidth,
+    drivableHalfWidth: trackSpace.drivableHalfWidth,
+    usablePassingWidth: trackSpace.usablePassingWidth,
+    estimatedLaneCount: trackSpace.estimatedLaneCount,
+    playerLateralRange: trackSpace.playerLateralRange,
+    cpuLateralRange: trackSpace.cpuLateralRange,
+    startingGridLateralSpread: trackSpace.startingGridLateralSpread,
+    trackEdgeBoundary: trackSpace.trackEdgeBoundary,
+    autoCenteringStrength: assist.laneCenteringStrength,
+    steeringAssistMode: assist.steeringAssistMode,
     curbCount: 0,
     guardrailCount: 0,
     tireWallCount: 0,
@@ -780,11 +822,11 @@ export function estimateTrackLateralDistance(position: THREE.Vector3, path: Trac
 }
 
 export function isInsideDrivableRoad(position: THREE.Vector3, path: TrackPath, radius = 0): boolean {
-  return getNearestTrackSample(position, path).absoluteLateralDistance - radius < DRIVABLE_HALF_WIDTH;
+  return getNearestTrackSample(position, path).absoluteLateralDistance - radius < createTrackSpaceProfile(path.track).drivableHalfWidth;
 }
 
 export function isInsideProtectedRoadZone(position: THREE.Vector3, path: TrackPath, radius = 0): boolean {
-  return getNearestTrackSample(position, path).absoluteLateralDistance - radius < PROTECTED_ROAD_HALF_WIDTH;
+  return getNearestTrackSample(position, path).absoluteLateralDistance - radius < createTrackSpaceProfile(path.track).protectedHalfWidth;
 }
 
 function createTrackSegments(path: TrackPath, segmentCount = VALIDATION_SEGMENTS): TrackSegment[] {
@@ -887,13 +929,14 @@ function keepOutsideProtectedRoadZone(
   trackSegments: TrackSegment[],
   preferredSide: number,
   radius: number,
+  trackSpace: TrackSpaceProfile,
   clearance = 0,
 ): THREE.Vector3 {
   const adjusted = position.clone();
-  const minimumLateralDistance = PROTECTED_ROAD_HALF_WIDTH + radius + clearance;
+  const minimumLateralDistance = trackSpace.protectedHalfWidth + radius + clearance;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const sample = getNearestTrackSampleFromSegments(adjusted, trackSegments);
-    if (sample.absoluteLateralDistance - radius >= PROTECTED_ROAD_HALF_WIDTH + clearance) return adjusted;
+    if (sample.absoluteLateralDistance - radius >= trackSpace.protectedHalfWidth + clearance) return adjusted;
     const side = sample.absoluteLateralDistance > 0.01 ? Math.sign(sample.lateralDistance) : Math.sign(preferredSide) || 1;
     adjusted.copy(sample.position).addScaledVector(sample.normal, side * minimumLateralDistance);
     adjusted.y = position.y;
@@ -916,11 +959,12 @@ function createCurbIntrusion(
   candidate: ValidationCandidate,
   trackSegments: TrackSegment[],
   radius: number,
+  trackSpace: TrackSpaceProfile,
 ): EnvironmentRoadOverlap | null {
   const sample = getNearestTrackSampleFromSegments(candidate.position, trackSegments);
-  const roadIntrusion = DRIVABLE_HALF_WIDTH - (sample.absoluteLateralDistance - radius);
+  const roadIntrusion = trackSpace.drivableHalfWidth - (sample.absoluteLateralDistance - radius);
   if (roadIntrusion <= MAX_CURB_ROAD_INTRUSION) return null;
-  return createRoadOverlapEntry(category, candidate, sample, DRIVABLE_HALF_WIDTH, radius);
+  return createRoadOverlapEntry(category, candidate, sample, trackSpace.drivableHalfWidth, radius);
 }
 
 function createRoadOverlap(
@@ -929,11 +973,12 @@ function createRoadOverlap(
   trackSegments: TrackSegment[],
   radius: number,
   object: THREE.Object3D,
+  trackSpace: TrackSpaceProfile,
 ): EnvironmentRoadOverlap | null {
   if (object.userData.allowRoadOverlap === true) return null;
   const sample = getNearestTrackSampleFromSegments(candidate.position, trackSegments);
-  if (sample.absoluteLateralDistance - radius >= PROTECTED_ROAD_HALF_WIDTH) return null;
-  return createRoadOverlapEntry(category, candidate, sample, PROTECTED_ROAD_HALF_WIDTH, radius);
+  if (sample.absoluteLateralDistance - radius >= trackSpace.protectedHalfWidth) return null;
+  return createRoadOverlapEntry(category, candidate, sample, trackSpace.protectedHalfWidth, radius);
 }
 
 function createRoadOverlapEntry(
@@ -1035,6 +1080,9 @@ function estimateEnvironmentDetailScore(report: EnvironmentValidationReport): nu
     report.tireWallIntrusionCount,
     report.sponsorSignIntrusionCount,
     report.tracksidePropIntrusionCount,
+    report.trackId === marinaTrackId && report.roadWidth < 15 ? 1 : 0,
+    report.trackId === marinaTrackId && report.usablePassingWidth < 12 ? 1 : 0,
+    report.trackId === marinaTrackId && report.estimatedLaneCount < 3 ? 1 : 0,
   ];
   const qualityRatio = qualityChecks.reduce((total, count) => total + (count === 0 ? 1 : 0), 0);
   return Math.round(((detailRatio + qualityRatio) / (thresholdEntries.length + qualityChecks.length)) * 100);
@@ -1068,6 +1116,14 @@ function environmentFailureReasons(report: EnvironmentValidationReport): string[
   if (report.tireWallIntrusionCount !== 0) failures.push(`tireWallIntrusionCount ${report.tireWallIntrusionCount} !== 0`);
   if (report.sponsorSignIntrusionCount !== 0) failures.push(`sponsorSignIntrusionCount ${report.sponsorSignIntrusionCount} !== 0`);
   if (report.tracksidePropIntrusionCount !== 0) failures.push(`tracksidePropIntrusionCount ${report.tracksidePropIntrusionCount} !== 0`);
+  if (report.trackId === marinaTrackId) {
+    if (report.roadWidth < 15) failures.push(`roadWidth ${report.roadWidth} < 15`);
+    if (report.usablePassingWidth < 12) failures.push(`usablePassingWidth ${report.usablePassingWidth} < 12`);
+    if (report.estimatedLaneCount < 3) failures.push(`estimatedLaneCount ${report.estimatedLaneCount} < 3`);
+    if (report.playerLateralRange.max < 6.2) failures.push(`playerLateralRange.max ${report.playerLateralRange.max} < 6.2`);
+    if (report.cpuLateralRange.max < 5.8) failures.push(`cpuLateralRange.max ${report.cpuLateralRange.max} < 5.8`);
+    if (report.autoCenteringStrength > 0.45) failures.push(`autoCenteringStrength ${report.autoCenteringStrength} > 0.45`);
+  }
   if (report.estimatedDetailScore < 80) failures.push(`estimatedDetailScore ${report.estimatedDetailScore} < 80`);
   return failures;
 }
@@ -1082,6 +1138,7 @@ function logEnvironmentValidationReport(report: EnvironmentValidationReport): vo
 }
 
 function createStartFinishGantry(path: TrackPath, track: TrackDefinition): THREE.Group {
+  const trackSpace = createTrackSpaceProfile(track);
   const pose = path.poseAt(0.992, 0);
   const gantry = new THREE.Group();
   gantry.name = 'start-finish-gantry';
@@ -1091,14 +1148,15 @@ function createStartFinishGantry(path: TrackPath, track: TrackDefinition): THREE
   const steel = new THREE.MeshLambertMaterial({ color: 0x23282e });
   const accent = new THREE.MeshLambertMaterial({ color: track.palette.accent });
   const red = new THREE.MeshBasicMaterial({ color: 0xe8141f });
+  const columnOffset = trackSpace.protectedHalfWidth + 0.9;
 
   const leftColumn = new THREE.Mesh(new THREE.BoxGeometry(0.55, 6.2, 0.55), steel);
   leftColumn.name = 'start-finish-left-column';
-  leftColumn.position.set(-7.25, 3.1, 0);
+  leftColumn.position.set(-columnOffset, 3.1, 0);
   const rightColumn = leftColumn.clone();
   rightColumn.name = 'start-finish-right-column';
-  rightColumn.position.x = 7.25;
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(15.2, 0.55, 0.62), steel);
+  rightColumn.position.x = columnOffset;
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(columnOffset * 2 + 0.7, 0.55, 0.62), steel);
   beam.position.set(0, 6.25, 0);
   const lightBar = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.8, 0.45), accent);
   lightBar.position.set(0, 5.6, -0.18);
@@ -1279,7 +1337,8 @@ function createMarinaTower(path: TrackPath, track: TrackDefinition): THREE.Group
 }
 
 function createPitLaneAndPaddock(path: TrackPath, track: TrackDefinition, detailLevel: SceneDetailLevel): THREE.Group {
-  const pose = path.poseAt(0.9, DRIVABLE_HALF_WIDTH + 16);
+  const trackSpace = createTrackSpaceProfile(track);
+  const pose = path.poseAt(0.9, trackSpace.drivableHalfWidth + 16);
   const group = new THREE.Group();
   group.name = 'marina-pit-lane-and-paddock';
   group.position.copy(pose.position);
@@ -1316,15 +1375,16 @@ function createPitLaneAndPaddock(path: TrackPath, track: TrackDefinition, detail
 }
 
 function createTracksideProps(path: TrackPath, track: TrackDefinition, detailLevel: SceneDetailLevel): THREE.Group {
+  const trackSpace = createTrackSpaceProfile(track);
   const group = new THREE.Group();
   group.name = 'marina-trackside-props';
-  const lights = createTrackLights(path, detailLevel);
-  const cones = createCones(path, detailLevel);
-  const crates = createCrates(path, detailLevel);
-  const bollards = createBollards(path, detailLevel);
-  const flags = createFlags(path, track, detailLevel);
-  const fencing = createFencing(path, detailLevel);
-  const platform = createViewingPlatform(path, track);
+  const lights = createTrackLights(path, detailLevel, trackSpace);
+  const cones = createCones(path, detailLevel, trackSpace);
+  const crates = createCrates(path, detailLevel, trackSpace);
+  const bollards = createBollards(path, detailLevel, trackSpace);
+  const flags = createFlags(path, track, detailLevel, trackSpace);
+  const fencing = createFencing(path, detailLevel, trackSpace);
+  const platform = createViewingPlatform(path, track, trackSpace);
   group.add(lights, cones, crates, bollards, flags, fencing, platform);
   group.userData.validationCount =
     (lights.userData.validationCount ?? 0) +
@@ -1337,7 +1397,7 @@ function createTracksideProps(path: TrackPath, track: TrackDefinition, detailLev
   return group;
 }
 
-function createTrackLights(path: TrackPath, detailLevel: SceneDetailLevel): THREE.Group {
+function createTrackLights(path: TrackPath, detailLevel: SceneDetailLevel, trackSpace: TrackSpaceProfile): THREE.Group {
   const group = new THREE.Group();
   group.name = 'track-light-posts';
   const count = detailLevel === 'battery' ? 18 : 28;
@@ -1347,8 +1407,8 @@ function createTrackLights(path: TrackPath, detailLevel: SceneDetailLevel): THRE
   const lampMat = new THREE.MeshBasicMaterial({ color: 0xfff1b8 });
   const posts = new THREE.InstancedMesh(postGeo, postMat, count);
   const lamps = new THREE.InstancedMesh(lampGeo, lampMat, count);
-  placeRepeatedTrackside(path, count, 0.02, 0.036, DRIVABLE_HALF_WIDTH + 9.8, 2.3, posts, Math.PI / 2);
-  placeRepeatedTrackside(path, count, 0.02, 0.036, DRIVABLE_HALF_WIDTH + 9.8, 4.75, lamps, Math.PI / 2);
+  placeRepeatedTrackside(path, count, 0.02, 0.036, trackSpace.drivableHalfWidth + 9.8, 2.3, posts, Math.PI / 2);
+  placeRepeatedTrackside(path, count, 0.02, 0.036, trackSpace.drivableHalfWidth + 9.8, 4.75, lamps, Math.PI / 2);
   tagForValidation(posts, 'trackside_prop', ['lighting', 'racing_detail'], count, { validationRadius: 0.18 });
   tagForValidation(lamps, 'trackside_prop', ['lighting', 'racing_detail'], count, { validationRadius: 0.45 });
   group.add(posts, lamps);
@@ -1356,46 +1416,46 @@ function createTrackLights(path: TrackPath, detailLevel: SceneDetailLevel): THRE
   return group;
 }
 
-function createCones(path: TrackPath, detailLevel: SceneDetailLevel): THREE.Group {
+function createCones(path: TrackPath, detailLevel: SceneDetailLevel, trackSpace: TrackSpaceProfile): THREE.Group {
   const group = new THREE.Group();
   const count = detailLevel === 'battery' ? 22 : 34;
   const cones = new THREE.InstancedMesh(new THREE.ConeGeometry(0.28, 0.72, 10), new THREE.MeshLambertMaterial({ color: 0xff6b1a }), count);
-  placeRepeatedTrackside(path, count, 0.05, 0.021, DRIVABLE_HALF_WIDTH + 3.8, 0.36, cones, 0);
+  placeRepeatedTrackside(path, count, 0.05, 0.021, trackSpace.drivableHalfWidth + 3.8, 0.36, cones, 0);
   tagForValidation(cones, 'trackside_prop', ['cone', 'track_edge'], count, { validationRadius: 0.28 });
   group.add(cones);
   group.userData.validationCount = count;
   return group;
 }
 
-function createCrates(path: TrackPath, detailLevel: SceneDetailLevel): THREE.Group {
+function createCrates(path: TrackPath, detailLevel: SceneDetailLevel, trackSpace: TrackSpaceProfile): THREE.Group {
   const group = new THREE.Group();
   const count = detailLevel === 'battery' ? 14 : 22;
   const crates = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 0.9, 1.1, 1, 1, 1), new THREE.MeshLambertMaterial({ color: 0x8f6b43 }), count);
-  placeRepeatedTrackside(path, count, 0.18, 0.031, DRIVABLE_HALF_WIDTH + 14, 0.45, crates, 0.4);
+  placeRepeatedTrackside(path, count, 0.18, 0.031, trackSpace.drivableHalfWidth + 14, 0.45, crates, 0.4);
   tagForValidation(crates, 'trackside_prop', ['service_prop', 'environment_density'], count, { validationRadius: 0.78 });
   group.add(crates);
   group.userData.validationCount = count;
   return group;
 }
 
-function createBollards(path: TrackPath, detailLevel: SceneDetailLevel): THREE.Group {
+function createBollards(path: TrackPath, detailLevel: SceneDetailLevel, trackSpace: TrackSpaceProfile): THREE.Group {
   const group = new THREE.Group();
   const count = detailLevel === 'battery' ? 24 : 36;
   const bollards = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.18, 0.22, 0.86, 10), new THREE.MeshLambertMaterial({ color: 0xf5f0df }), count);
-  placeRepeatedTrackside(path, count, 0.08, 0.019, DRIVABLE_HALF_WIDTH + 5.2, 0.43, bollards, 0);
+  placeRepeatedTrackside(path, count, 0.08, 0.019, trackSpace.drivableHalfWidth + 5.2, 0.43, bollards, 0);
   tagForValidation(bollards, 'trackside_prop', ['bollard', 'track_edge'], count, { validationRadius: 0.22 });
   group.add(bollards);
   group.userData.validationCount = count;
   return group;
 }
 
-function createFlags(path: TrackPath, track: TrackDefinition, detailLevel: SceneDetailLevel): THREE.Group {
+function createFlags(path: TrackPath, track: TrackDefinition, detailLevel: SceneDetailLevel, trackSpace: TrackSpaceProfile): THREE.Group {
   const group = new THREE.Group();
   const count = detailLevel === 'battery' ? 10 : 16;
   const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.13, 2.2, 0.13, 1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xf7fbff }), count);
   const flags = new THREE.InstancedMesh(new THREE.BoxGeometry(0.9, 0.48, 0.08, 1, 1, 1), new THREE.MeshBasicMaterial({ color: track.palette.accent }), count);
-  placeRepeatedTrackside(path, count, 0.12, 0.041, DRIVABLE_HALF_WIDTH + 12.4, 1.1, posts, Math.PI / 2);
-  placeRepeatedTrackside(path, count, 0.12, 0.041, DRIVABLE_HALF_WIDTH + 12.4, 2.05, flags, Math.PI / 2);
+  placeRepeatedTrackside(path, count, 0.12, 0.041, trackSpace.drivableHalfWidth + 12.4, 1.1, posts, Math.PI / 2);
+  placeRepeatedTrackside(path, count, 0.12, 0.041, trackSpace.drivableHalfWidth + 12.4, 2.05, flags, Math.PI / 2);
   tagForValidation(posts, 'trackside_prop', ['flag', 'marina_identity'], count, { validationRadius: 0.14 });
   tagForValidation(flags, 'trackside_prop', ['flag', 'marina_identity'], count, { validationRadius: 0.45 });
   group.add(posts, flags);
@@ -1403,19 +1463,19 @@ function createFlags(path: TrackPath, track: TrackDefinition, detailLevel: Scene
   return group;
 }
 
-function createFencing(path: TrackPath, detailLevel: SceneDetailLevel): THREE.Group {
+function createFencing(path: TrackPath, detailLevel: SceneDetailLevel, trackSpace: TrackSpaceProfile): THREE.Group {
   const group = new THREE.Group();
   const count = detailLevel === 'battery' ? 24 : 38;
   const fences = new THREE.InstancedMesh(new THREE.BoxGeometry(3.2, 1.7, 0.12, 1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xb7c3cb }), count);
-  placeRepeatedTrackside(path, count, 0.24, 0.018, -(DRIVABLE_HALF_WIDTH + 7.6), 0.86, fences, Math.PI / 2);
+  placeRepeatedTrackside(path, count, 0.24, 0.018, -(trackSpace.drivableHalfWidth + 7.6), 0.86, fences, Math.PI / 2);
   tagForValidation(fences, 'trackside_prop', ['fencing', 'track_edge'], count, { validationRadius: 0.22 });
   group.add(fences);
   group.userData.validationCount = count;
   return group;
 }
 
-function createViewingPlatform(path: TrackPath, track: TrackDefinition): THREE.Group {
-  const pose = path.poseAt(0.62, DRIVABLE_HALF_WIDTH + 24);
+function createViewingPlatform(path: TrackPath, track: TrackDefinition, trackSpace: TrackSpaceProfile): THREE.Group {
+  const pose = path.poseAt(0.62, trackSpace.drivableHalfWidth + 24);
   const group = new THREE.Group();
   group.name = 'marina-viewing-platform';
   group.position.copy(pose.position);
@@ -1461,7 +1521,7 @@ function placeRepeatedTrackside(
 }
 
 export function createPodiumCeremony(path: TrackPath, track: TrackDefinition, finaleMode: boolean): PodiumCeremony {
-  const pose = path.poseAt(0.03, DRIVABLE_HALF_WIDTH + 20);
+  const pose = path.poseAt(0.03, createTrackSpaceProfile(track).drivableHalfWidth + 20);
   const group = new THREE.Group();
   group.name = finaleMode ? 'campaign-finale-podium' : 'race-podium';
   group.position.copy(pose.position);
