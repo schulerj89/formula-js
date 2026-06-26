@@ -129,6 +129,7 @@ p {
 
 .menu-actions,
 .menu-utility,
+.menu-links,
 .setup-grid,
 .settings-grid,
 .race-actions {
@@ -142,28 +143,46 @@ p {
 }
 
 .menu-utility {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  max-width: 520px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 420px;
   gap: 8px;
 }
 
-.menu-utility .secondary,
-.utility-link {
+.menu-links {
+  grid-template-columns: repeat(2, max-content);
+  gap: 18px;
+}
+
+.menu-utility .secondary {
   min-height: 38px;
   padding: 0 8px;
   color: #dcecff;
   font-size: 0.72rem;
-  text-decoration: none;
 }
 
-.utility-link {
-  display: grid;
-  place-items: center;
+.text-link {
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  color: #dcecff;
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 .setup-panel {
   width: min(440px, 100%);
   padding: 14px;
+}
+
+.setup-panel[hidden] {
+  display: none;
 }
 
 .setup-panel h2 {
@@ -713,6 +732,10 @@ p {
     gap: 8px;
   }
 
+  .screen[data-screen="menu"][data-menu-stage="title"] {
+    gap: 18px;
+  }
+
   .kicker {
     font-size: 0.68rem;
   }
@@ -727,9 +750,13 @@ p {
     font-size: 0.86rem;
   }
 
-  .menu-utility .secondary,
-  .utility-link {
+  .menu-utility .secondary {
     min-height: 34px;
+    font-size: 0.64rem;
+  }
+
+  .text-link {
+    min-height: 28px;
     font-size: 0.64rem;
   }
 
@@ -787,10 +814,6 @@ p {
 
   .leaderboard-toggle.available {
     display: block;
-  }
-
-  .menu-utility {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .track-strip {

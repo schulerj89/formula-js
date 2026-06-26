@@ -8,12 +8,27 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await page.goto('/');
   await page.waitForFunction(() => Boolean((window as any).__GRIDLINE_APEX__?.ready));
   await expect(page.getByRole('heading', { name: 'Gridline Apex' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Race Setup' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Campaign' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Time Attack' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Replay' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Garage' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Race Setup' })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Race' })).toBeHidden();
   await expect(page.getByRole('link', { name: 'Asset Inspector' })).toBeVisible();
+  await expect(page.locator('[data-screen="menu"]')).toHaveAttribute('data-menu-stage', 'title');
+  let menuMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics?.menu);
+  expect(menuMetrics.setupOpen).toBe(false);
   await page.screenshot({ path: testInfo.outputPath('title-menu.png'), fullPage: true });
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.previewTrack !== (window as any).__GRIDLINE_APEX__?.metrics?.track, null, {
     timeout: 10_000,
   });
+  await page.getByRole('button', { name: 'Garage' }).click();
+  await expect(page.getByRole('heading', { name: 'Race Setup' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Race' })).toBeVisible();
+  await expect(page.locator('[data-screen="menu"]')).toHaveAttribute('data-menu-stage', 'setup');
+  menuMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics?.menu);
+  expect(menuMetrics.setupOpen).toBe(true);
   await page.getByRole('button', { name: 'Azure' }).click();
   await page.getByRole('button', { name: 'Gold' }).click();
   await page.getByRole('button', { name: 'Tutorial' }).click();

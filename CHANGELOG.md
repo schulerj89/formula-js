@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.20.0 - 2026-06-26
+
+- Decluttered the default title page by hiding full race setup controls until Garage or a race mode is selected.
+- Added a Garage utility action that preserves mobile access to name, track, body paint, helmet paint, and Race.
+- Added menu debug metrics and browser coverage for the collapsed and expanded setup states.
+
 ## 1.19.0 - 2026-06-26
 
 - Made on-screen race controls visually match the selected control mode.

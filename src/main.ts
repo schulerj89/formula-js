@@ -124,7 +124,7 @@ root.innerHTML = `
   <div class="game-shell">
     <canvas class="game-canvas" aria-label="Gridline Apex race view"></canvas>
 
-    <section class="screen active" data-screen="menu">
+    <section class="screen active" data-screen="menu" data-menu-stage="title">
       <div class="menu-top">
         <p class="kicker">Mobile formula racing</p>
         <h1>Gridline Apex</h1>
@@ -133,13 +133,16 @@ root.innerHTML = `
           <button class="secondary" data-action="timeAttack">Time Attack</button>
         </div>
         <div class="menu-utility">
-          <button class="secondary" data-action="tutorial">Tutorial</button>
           <button class="secondary" data-action="settings">Settings</button>
           <button class="secondary" data-action="replay">Replay</button>
-          <a class="secondary utility-link" href="asset-inspector.html">Asset Inspector</a>
+          <button class="secondary" data-action="garage">Garage</button>
+        </div>
+        <div class="menu-links">
+          <button class="text-link" data-action="tutorial">Tutorial</button>
+          <a class="text-link" href="asset-inspector.html">Asset Inspector</a>
         </div>
       </div>
-      <div class="panel setup-panel">
+      <div class="panel setup-panel" id="setupPanel" hidden>
         <h2>Race Setup</h2>
         <div class="setup-grid">
           <label class="field"><span>Name</span><input id="playerName" maxlength="18" /></label>
@@ -268,6 +271,8 @@ const formulaAssets = createFormulaAssetManager();
 const playerNameInput = root.querySelector<HTMLInputElement>('#playerName')!;
 const trackSelect = root.querySelector<HTMLSelectElement>('#trackSelect')!;
 const trackStrip = root.querySelector<HTMLDivElement>('#trackStrip')!;
+const menuScreen = root.querySelector<HTMLElement>('[data-screen="menu"]')!;
+const setupPanel = root.querySelector<HTMLDivElement>('#setupPanel')!;
 const bodyPaintSwatches = root.querySelector<HTMLDivElement>('#bodyPaintSwatches')!;
 const helmetPaintSwatches = root.querySelector<HTMLDivElement>('#helmetPaintSwatches')!;
 const caption = root.querySelector<HTMLDivElement>('#caption')!;
@@ -374,6 +379,8 @@ function initUi(): void {
     } else if (action === 'timeAttack') {
       mode = 'timeAttack';
       showSetup();
+    } else if (action === 'garage') {
+      showSetup();
     } else if (action === 'settings') {
       showScreen('settings');
     } else if (action === 'toggleLeaderboard') {
@@ -385,6 +392,7 @@ function initUi(): void {
     } else if (action === 'back' || action === 'menu') {
       gameState = 'menu';
       audio.stopEngine();
+      setSetupPanelOpen(false);
       showScreen('menu');
       loadMenuScene();
     } else if (action === 'race') {
@@ -494,7 +502,13 @@ function showSetup(): void {
   trackSelect.value = selectedTrack.id;
   initUi();
   gameState = 'setup';
+  setSetupPanelOpen(true);
   showScreen('menu');
+}
+
+function setSetupPanelOpen(open: boolean): void {
+  setupPanel.hidden = !open;
+  menuScreen.dataset.menuStage = open ? 'setup' : 'title';
 }
 
 function startPreRace(): void {
@@ -1309,6 +1323,7 @@ function saveSettings(): void {
 
 function showScreen(screen: GameState | 'settings' | null): void {
   root.querySelectorAll<HTMLElement>('.screen').forEach((element) => element.classList.toggle('active', element.dataset.screen === screen));
+  if (screen === 'menu') setSetupPanelOpen(gameState === 'setup');
 }
 
 function resize(): void {
@@ -1408,6 +1423,12 @@ function buildDebugMetrics() {
       debugMetricCadenceMs: 200,
     },
     state: gameState,
+    menu: {
+      setupOpen: !setupPanel.hidden,
+      visibleActionCount: [...root.querySelectorAll<HTMLElement>('[data-screen="menu"] .menu-top button, [data-screen="menu"] .menu-top a')].filter(
+        (item) => item.offsetParent !== null,
+      ).length,
+    },
     track: selectedTrack.id,
     previewTrack: menuPreviewTrack.id,
     replayFrames: lastReplay?.frames.length ?? 0,

@@ -20,7 +20,7 @@ Keep ElevenLabs credentials outside git. The generator reads `ELEVENLABS_API_KEY
 
 ## Current Slice
 
-- Decluttered title menu with track flyover camera, primary race actions, and secondary utility links.
+- Decluttered title menu with track flyover camera, primary race actions, secondary utility links, and a collapsible Garage setup panel.
 - Campaign, time attack, settings, replay, and podium flow.
 - Browser smoke coverage clicks through the Campaign podium and Finale path using deterministic race finishes.
 - Tutorial panel with launch, braking, tyre, and damage guidance.
