@@ -20,6 +20,19 @@ export interface TracksideDetailStats {
   totalInstances: number;
 }
 
+export interface PodiumCeremony {
+  group: THREE.Group;
+  slots: Array<{ rank: 1 | 2 | 3; position: THREE.Vector3; yaw: number }>;
+  stats: PodiumCeremonyStats;
+}
+
+export interface PodiumCeremonyStats {
+  platforms: number;
+  lightRigs: number;
+  confettiPieces: number;
+  finaleMode: boolean;
+}
+
 const roadWidth = 11;
 type CarFactory = (racer: RacerDefinition) => THREE.Group;
 
@@ -365,4 +378,80 @@ function createStartGantry(path: TrackPath, track: TrackDefinition): THREE.Group
     gantry.add(light);
   }
   return gantry;
+}
+
+export function createPodiumCeremony(path: TrackPath, track: TrackDefinition, finaleMode: boolean): PodiumCeremony {
+  const pose = path.poseAt(0.03, roadWidth / 2 + 20);
+  const group = new THREE.Group();
+  group.name = finaleMode ? 'campaign-finale-podium' : 'race-podium';
+  group.position.copy(pose.position);
+  group.rotation.y = pose.yaw - Math.PI / 2;
+
+  const baseMat = new THREE.MeshLambertMaterial({ color: 0xf5f7fb });
+  const winnerMat = new THREE.MeshLambertMaterial({ color: finaleMode ? 0xffd166 : track.palette.accent });
+  const darkMat = new THREE.MeshLambertMaterial({ color: 0x20252b });
+  const lightMat = new THREE.MeshBasicMaterial({ color: finaleMode ? 0xfff2a8 : 0xffffff });
+
+  const platformData = [
+    { rank: 2 as const, x: -4.1, height: 0.9, width: 3.6, mat: baseMat },
+    { rank: 1 as const, x: 0, height: 1.45, width: 4.1, mat: winnerMat },
+    { rank: 3 as const, x: 4.1, height: 0.65, width: 3.6, mat: baseMat },
+  ];
+  const slots: PodiumCeremony['slots'] = [];
+
+  for (const item of platformData) {
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(item.width, item.height, 3.4, 1, 1, 1), item.mat);
+    platform.position.set(item.x, item.height / 2, 0);
+    group.add(platform);
+    slots.push({ rank: item.rank, position: new THREE.Vector3(item.x, item.height + 0.34, -0.15), yaw: group.rotation.y + Math.PI });
+  }
+
+  const rearWall = new THREE.Mesh(new THREE.BoxGeometry(12.5, 4.2, 0.36, 1, 1, 1), darkMat);
+  rearWall.position.set(0, 2.35, 2.2);
+  const banner = new THREE.Mesh(new THREE.BoxGeometry(9.8, 0.72, 0.42, 1, 1, 1), winnerMat);
+  banner.position.set(0, 3.55, 1.96);
+  group.add(rearWall, banner);
+
+  const rigMat = new THREE.MeshLambertMaterial({ color: 0x101316 });
+  for (const x of [-5.8, 5.8]) {
+    const mast = new THREE.Mesh(new THREE.BoxGeometry(0.28, 4.4, 0.28), rigMat);
+    mast.position.set(x, 2.2, 1.1);
+    const light = new THREE.Mesh(new THREE.SphereGeometry(0.32, 16, 8), lightMat);
+    light.position.set(x * 0.92, 4.45, -0.7);
+    group.add(mast, light);
+  }
+
+  const confettiPieces = finaleMode ? 150 : 90;
+  const confettiGeo = new THREE.BoxGeometry(0.18, 0.035, 0.08, 1, 1, 1);
+  const confettiMat = new THREE.MeshBasicMaterial({ color: finaleMode ? 0xffd166 : track.palette.accent });
+  const confetti = new THREE.InstancedMesh(confettiGeo, confettiMat, confettiPieces);
+  const matrix = new THREE.Matrix4();
+  const rotation = new THREE.Quaternion();
+  const scale = new THREE.Vector3(1, 1, 1);
+  for (let i = 0; i < confettiPieces; i += 1) {
+    const x = -5.8 + (i % 23) * 0.52;
+    const y = 2.1 + (i % 11) * 0.28;
+    const z = -1.8 + ((i * 7) % 31) * 0.12;
+    rotation.setFromEuler(new THREE.Euler((i % 5) * 0.7, (i % 9) * 0.4, (i % 13) * 0.3));
+    matrix.compose(new THREE.Vector3(x, y, z), rotation, scale);
+    confetti.setMatrixAt(i, matrix);
+  }
+  confetti.instanceMatrix.needsUpdate = true;
+  group.add(confetti);
+
+  group.updateMatrixWorld(true);
+  slots.forEach((slot) => {
+    slot.position = group.localToWorld(slot.position.clone());
+  });
+
+  return {
+    group,
+    slots,
+    stats: {
+      platforms: 3,
+      lightRigs: 2,
+      confettiPieces,
+      finaleMode,
+    },
+  };
 }

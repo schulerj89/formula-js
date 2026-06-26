@@ -12,7 +12,7 @@ import { createFormulaAssetManager } from './game/formulaAssets';
 import { animateDriverIdle } from './game/models';
 import { createRace, createResults, type RaceControl, type RaceSnapshot } from './game/race';
 import { createReplayRecorder, findReplayFrame, type RaceReplay, type ReplayRecorder } from './game/replay';
-import { buildRaceScene, type SceneBuild } from './game/scene';
+import { buildRaceScene, createPodiumCeremony, type PodiumCeremonyStats, type SceneBuild } from './game/scene';
 import type { GameMode, GameSettings, GameState, RacerDefinition, RaceResult, TrackDefinition } from './types';
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -53,11 +53,18 @@ let replayWrappedElapsed = 0;
 let replayEventIndex = 0;
 let replayNextCaptionAt = 0;
 let replayFocusRacerId = 'player';
+let podiumGroup: THREE.Group | null = null;
+let podiumStats: PodiumCeremonyStats | null = null;
+let podiumFocusId: string | null = null;
+let podiumTopThreeIds: string[] = [];
+let podiumStagedCarCount = 0;
+let podiumParkedCarCount = 0;
 let menuFlyoverIndex = 0;
 let menuFlyoverTimer = 0;
 let menuPreviewTrack = selectedTrack;
 const frameTimes: number[] = [];
 let frameTimeWindow = 0;
+const roadParkingBase = 17;
 
 const control: RaceControl = { throttle: false, brake: false, steer: 0 };
 const keys = new Set<string>();
@@ -453,6 +460,7 @@ function finishRace(snapshot: RaceSnapshot): void {
     campaignScores = applyCampaignResults(campaignScores.length ? campaignScores : createCampaignScores(buildRacers()), results);
   }
   gameState = 'podium';
+  stagePodiumCeremony(results.slice(0, 3).map((result) => result.racerId), false);
   audio.stopEngine();
   controls.classList.remove('active');
   hud.classList.remove('active');
@@ -468,6 +476,9 @@ function buildRacers(): RacerDefinition[] {
 }
 
 function loadMenuScene(): void {
+  podiumGroup = null;
+  podiumStats = null;
+  podiumFocusId = null;
   menuPreviewTrack = selectedTrack;
   menuFlyoverIndex = tracks.findIndex((track) => track.id === selectedTrack.id);
   menuFlyoverTimer = 7;
@@ -508,9 +519,12 @@ function updateRaceCamera(snapshot: RaceSnapshot): void {
 }
 
 function updatePodiumCamera(dt: number, finale: boolean): void {
-  if (!sceneBuild || !results[0]) return;
-  const targetId = finale ? campaignLeader(campaignScores)?.racerId ?? results[0].racerId : results[0].racerId;
+  if (!sceneBuild) return;
+  const fallbackId = finale ? campaignLeader(campaignScores)?.racerId ?? results[0]?.racerId : results[0]?.racerId;
+  const targetId = podiumFocusId ?? fallbackId;
+  if (!targetId) return;
   const winner = sceneBuild.cars.get(targetId);
+  if (!winner) return;
   const elapsed = performance.now() * 0.001;
   const radius = finale ? 18 : 12;
   const target = winner?.position ?? new THREE.Vector3();
@@ -612,6 +626,7 @@ function renderCampaignStandings(): void {
 function showCampaignFinale(): void {
   const champion = campaignLeader(campaignScores);
   gameState = 'finale';
+  stagePodiumCeremony(campaignScores.slice(0, 3).map((score) => score.racerId), true);
   showScreen('podium');
   root.querySelector<HTMLHeadingElement>('#podiumTitle')!.textContent = 'Campaign Champions';
   root.querySelector<HTMLDivElement>('#podiumResults')!.innerHTML = campaignScores
@@ -622,6 +637,89 @@ function showCampaignFinale(): void {
   root.querySelector<HTMLButtonElement>('#nextRaceButton')!.textContent = 'Done';
   showCaption('Mags Whitlow', fill(dialogue.finale[1][1]));
   if (champion) showCaption('Arthur Bell', `${champion.name} is champion after ${tracks.length} races.`);
+}
+
+function forcePodiumForSmoke(finaleMode = false): void {
+  const racers = buildRacers();
+  if (!sceneBuild) sceneBuild = buildRaceScene(scene, selectedTrack, racers, createSceneCar);
+  results = racers.slice(0, 3).map((racer, index) => ({
+    racerId: racer.id,
+    name: racer.name,
+    totalTime: 84 + index * 1.7,
+    bestLap: 27 + index * 0.4,
+    damage: 0.92 - index * 0.05,
+    tires: 0.74 - index * 0.04,
+  }));
+  campaignScores = campaignScores.length ? campaignScores : createCampaignScores(racers);
+  if (finaleMode) {
+    campaignScores = campaignScores.map((score, index) => ({
+      ...score,
+      points: 96 - index * 8,
+      wins: index === 0 ? 3 : index === 1 ? 1 : 0,
+      podiums: Math.max(0, 4 - index),
+      lastFinish: index + 1,
+    }));
+    gameState = 'finale';
+    showCampaignFinale();
+  } else {
+    gameState = 'podium';
+    stagePodiumCeremony(results.map((result) => result.racerId), false);
+    showScreen('podium');
+    renderPodium();
+    showCaption('Arthur Bell', fill(dialogue.podium[0][1]));
+  }
+}
+
+function stagePodiumCeremony(racerIds: string[], finaleMode: boolean): void {
+  if (!sceneBuild) return;
+  if (podiumGroup) {
+    scene.remove(podiumGroup);
+    disposeObject(podiumGroup);
+  }
+  const ceremony = createPodiumCeremony(sceneBuild.path, selectedTrack, finaleMode);
+  podiumGroup = ceremony.group;
+  podiumStats = ceremony.stats;
+  podiumFocusId = racerIds[0] ?? null;
+  podiumTopThreeIds = racerIds.slice(0, 3);
+  podiumStagedCarCount = 0;
+  podiumParkedCarCount = 0;
+  scene.add(ceremony.group);
+  const podiumIds = new Set(podiumTopThreeIds);
+  for (const [racerId, car] of sceneBuild.cars) {
+    car.visible = podiumIds.has(racerId);
+    car.scale.setScalar(0.86);
+    if (!car.visible) {
+      podiumParkedCarCount += 1;
+      const parkPose = sceneBuild.path.poseAt(0.065 + podiumParkedCarCount * 0.006, roadSideParkOffset(podiumParkedCarCount));
+      car.position.copy(parkPose.position);
+      car.position.y = 0.2;
+      car.rotation.y = parkPose.yaw;
+    }
+  }
+  ceremony.slots.forEach((slot) => {
+    const racerId = racerIds[slot.rank - 1];
+    const car = racerId ? sceneBuild?.cars.get(racerId) : null;
+    if (!car) return;
+    podiumStagedCarCount += 1;
+    car.visible = true;
+    car.position.copy(slot.position);
+    car.rotation.y = slot.yaw;
+    car.scale.setScalar(slot.rank === 1 && finaleMode ? 1.04 : 0.92);
+  });
+}
+
+function roadSideParkOffset(index: number): number {
+  return roadParkingBase + (index % 4) * 1.4;
+}
+
+function disposeObject(object: THREE.Object3D): void {
+  object.traverse((item) => {
+    const mesh = item as THREE.Mesh;
+    if ('geometry' in mesh && mesh.geometry) mesh.geometry.dispose();
+    const material = mesh.material as THREE.Material | THREE.Material[] | undefined;
+    if (Array.isArray(material)) material.forEach((entry) => entry.dispose());
+    else material?.dispose();
+  });
 }
 
 function showReplayScreen(): void {
@@ -788,6 +886,14 @@ function exposeDebug(): void {
     lightsOn,
     campaignLeader: campaignLeader(campaignScores)?.name ?? null,
     sceneDetails: sceneBuild?.detailStats ?? null,
+    podium: {
+      active: Boolean(podiumGroup),
+      focusRacerId: podiumFocusId,
+      topThreeRacerIds: podiumTopThreeIds,
+      stagedCarCount: podiumStagedCarCount,
+      parkedCarCount: podiumParkedCarCount,
+      stats: podiumStats,
+    },
     audio: audio.metrics(),
     assetKit: formulaAssetManifest,
     assetStatus: formulaAssets.metrics(),
@@ -802,6 +908,9 @@ function exposeDebug(): void {
     results,
     campaignScores,
     replay: lastReplay,
+    debug: {
+      forcePodium: forcePodiumForSmoke,
+    },
   };
 }
 

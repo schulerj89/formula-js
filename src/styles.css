@@ -67,6 +67,28 @@ select {
   pointer-events: auto;
 }
 
+.screen[data-screen="podium"] {
+  justify-content: flex-start;
+}
+
+.screen[data-screen="podium"] .panel {
+  max-height: calc(100vh - 42px);
+  overflow-y: auto;
+}
+
+#podiumResults {
+  display: grid;
+  gap: 8px;
+}
+
+#podiumResults p {
+  padding: 8px 10px;
+  background: rgb(255 255 255 / 9%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 8px;
+  color: #f7fbff;
+}
+
 .menu-top {
   display: grid;
   gap: 14px;
@@ -363,6 +385,10 @@ p {
 .screen[data-screen="settings"].active ~ .caption,
 .screen[data-screen="replay"].active ~ .caption {
   display: none;
+}
+
+.screen[data-screen="podium"].active ~ .caption {
+  bottom: max(18px, env(safe-area-inset-bottom));
 }
 
 .caption strong {

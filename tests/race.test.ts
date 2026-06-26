@@ -8,6 +8,7 @@ import { analyzeRaceAudio } from '../src/game/audio';
 import { createRace } from '../src/game/race';
 import { applyCampaignResults, createCampaignScores } from '../src/game/campaign';
 import { createReplayEvents, createReplayRecorder, estimateReplayBytes, findReplayFrame } from '../src/game/replay';
+import { createPodiumCeremony } from '../src/game/scene';
 import { TrackPath } from '../src/game/trackPath';
 import type { GameSettings } from '../src/types';
 
@@ -32,6 +33,18 @@ describe('track data', () => {
       expect(track.landmarks.length).toBeGreaterThanOrEqual(3);
       expect(new TrackPath(track).length).toBeGreaterThan(650);
     }
+  });
+
+  it('builds a three-step podium ceremony with finale confetti scaling', () => {
+    const path = new TrackPath(tracks[0]);
+    const racePodium = createPodiumCeremony(path, tracks[0], false);
+    const finalePodium = createPodiumCeremony(path, tracks[0], true);
+    expect(racePodium.slots.map((slot) => slot.rank).sort()).toEqual([1, 2, 3]);
+    expect(racePodium.stats.platforms).toBe(3);
+    expect(racePodium.stats.lightRigs).toBe(2);
+    expect(racePodium.stats.confettiPieces).toBe(90);
+    expect(finalePodium.stats.confettiPieces).toBeGreaterThan(racePodium.stats.confettiPieces);
+    expect(finalePodium.stats.finaleMode).toBe(true);
   });
 });
 

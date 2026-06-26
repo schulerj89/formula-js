@@ -61,4 +61,26 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   const settings = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.settings);
   expect(settings.bodyPaint).toBe('azure');
   expect(settings.helmetPaint).toBe('gold');
+
+  await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.debug?.forcePodium?.());
+  await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'podium');
+  await page.screenshot({ path: testInfo.outputPath('podium.png'), fullPage: true });
+  const podiumMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
+  expect(podiumMetrics.podium.active).toBe(true);
+  expect(podiumMetrics.podium.focusRacerId).toBe('player');
+  expect(podiumMetrics.podium.topThreeRacerIds).toHaveLength(3);
+  expect(podiumMetrics.podium.stagedCarCount).toBe(3);
+  expect(podiumMetrics.podium.parkedCarCount).toBe(5);
+  expect(podiumMetrics.podium.stats.platforms).toBe(3);
+  expect(podiumMetrics.podium.stats.confettiPieces).toBe(90);
+
+  await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.debug?.forcePodium?.(true));
+  await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'finale');
+  await page.screenshot({ path: testInfo.outputPath('finale.png'), fullPage: true });
+  const finaleMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
+  expect(finaleMetrics.podium.active).toBe(true);
+  expect(finaleMetrics.podium.stats.finaleMode).toBe(true);
+  expect(finaleMetrics.podium.stats.confettiPieces).toBeGreaterThan(podiumMetrics.podium.stats.confettiPieces);
+  expect(finaleMetrics.podium.stagedCarCount).toBe(3);
+  expect(finaleMetrics.podium.parkedCarCount).toBe(5);
 });

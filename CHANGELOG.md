@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0 - 2026-06-26
+
+- Added a world-space podium ceremony with three staged platforms, light rigs, and confetti.
+- Staged the top three cars on the podium while parking non-podium cars out of the ceremony shot.
+- Added campaign finale podium staging with denser confetti and winner-focused camera metrics.
+- Added debug smoke hooks plus desktop/mobile podium and finale screenshots.
+
 ## 0.9.0 - 2026-06-26
 
 - Added compact replay highlight events with timed Arthur, Mags, and Radio captions during replay playback.
