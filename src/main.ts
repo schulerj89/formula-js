@@ -15,7 +15,7 @@ import { createRace, createResults, type RaceControl, type RaceSnapshot } from '
 import { pickActiveRaceEvent, type RaceCommentaryKind } from './game/raceCommentary';
 import { createTrackMapLayout, summarizeRaceReadability, type TrackMapLayout } from './game/raceReadability';
 import { createReplayRecorder, findReplayFrame, type RaceReplay, type ReplayRecorder } from './game/replay';
-import { buildRaceScene, createPodiumCeremony, type PodiumCeremonyStats, type SceneBuild } from './game/scene';
+import { buildRaceScene, createPodiumCeremony, type PodiumCeremonyStats, type SceneBuild, type SceneDetailLevel } from './game/scene';
 import type { GameMode, GameSettings, GameState, RacerDefinition, RaceResult, TrackDefinition } from './types';
 
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -48,6 +48,7 @@ let lastCaptionSpeaker: string | null = null;
 let lastCaptionText: string | null = null;
 let lightTimer = 0;
 let lightsOn = 0;
+let lastLightBeep = 0;
 let lastRadio = '';
 let lastContactRadioEvent = 0;
 let raceCommentaryElapsed = 0;
@@ -96,9 +97,13 @@ let readoutClosingBehind = false;
 let readoutSideBySide: string | null = null;
 let nextBrakeMeters: number | null = null;
 let brakeUrgency: 'clear' | 'soon' | 'now' = 'clear';
+let captionQueue: Array<{ speaker: string; text: string; duration: number }> = [];
+let captionQueueDelivered = 0;
+let captionQueueSpeakers: string[] = [];
 const frameTimes: number[] = [];
 let frameTimeWindow = 0;
 const roadParkingBase = 17;
+const preraceSequenceSeconds = 6.2;
 
 const control: RaceControl = { throttle: false, brake: false, steer: 0 };
 const keys = new Set<string>();
@@ -237,7 +242,7 @@ root.innerHTML = `
 
 const canvas = root.querySelector<HTMLCanvasElement>('.game-canvas')!;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, settings.performanceMode === 'highDetail' ? 2 : 1.45));
+renderer.setPixelRatio(targetPixelRatio());
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
@@ -351,7 +356,7 @@ function initUi(): void {
     } else if (action === 'tutorial') {
       gameState = 'tutorial';
       showScreen('tutorial');
-      showCaption('Arthur Bell', fill(dialogue.tutorial[0][1]));
+      queueDialogue(dialogue.tutorial, 3.8);
     } else if (action === 'back' || action === 'menu') {
       gameState = 'menu';
       audio.stopEngine();
@@ -453,7 +458,9 @@ function update(dt: number): void {
   }
 
   captionTimer -= dt;
-  if (captionTimer <= 0 && (gameState === 'menu' || gameState === 'race')) rotateCaption();
+  if (captionTimer <= 0) {
+    if (!showNextQueuedCaption() && (gameState === 'menu' || gameState === 'race')) rotateCaption();
+  }
   exposeDebug();
 }
 
@@ -470,6 +477,7 @@ function startPreRace(): void {
   saveSettings();
   gameState = 'prerace';
   lightsOn = 0;
+  lastLightBeep = 0;
   lastContactRadioEvent = 0;
   lastRadio = '';
   raceCommentaryElapsed = 0;
@@ -491,16 +499,15 @@ function startPreRace(): void {
   hud.classList.remove('active');
   controls.classList.remove('active');
   const racers = buildRacers();
-  sceneBuild = buildRaceScene(scene, selectedTrack, racers, createSceneCar);
+  sceneBuild = buildRaceScene(scene, selectedTrack, racers, createSceneCar, sceneDetailLevel());
   renderTrackMapRoute();
   race = createRace(mode, selectedTrack, racers, settings);
   replayRecorder = createReplayRecorder(selectedTrack.id, selectedTrack.name, settings.playerName);
   latestSnapshot = race.snapshot();
   lastCommentaryPosition = latestSnapshot.position;
   replayRecorder.record(0, latestSnapshot);
-  lightTimer = 3.4;
-  audio.beep(5);
-  showCaption('Arthur Bell', fill(dialogue.prerace[0][1]));
+  lightTimer = preraceSequenceSeconds;
+  queueDialogue([...dialogue.prerace, dialogue.lights[0]], 2.1);
 }
 
 function startRace(): void {
@@ -514,13 +521,18 @@ function startRace(): void {
   control.brake = false;
   control.throttle = false;
   control.steer = 0;
-  showCaption('Mags Whitlow', fill(dialogue.lights[1][1]));
+  clearCaptionQueue(false);
+  showCaption('Mags Whitlow', fill(dialogue.lights[1][1]), 4.4);
 }
 
 function updateStartLights(): void {
   const elapsed = 3.4 - lightTimer;
   lightsOn = Math.min(5, Math.max(0, Math.floor(elapsed / 0.48) + 1));
   if (lightTimer <= 0.35) lightsOn = 5;
+  if (lightsOn > lastLightBeep) {
+    audio.beep(1);
+    lastLightBeep = lightsOn;
+  }
   startLights.querySelectorAll<HTMLElement>('.start-light').forEach((light, index) => {
     light.classList.toggle('on', index < lightsOn);
   });
@@ -557,7 +569,7 @@ function loadMenuScene(): void {
   menuPreviewTrack = selectedTrack;
   menuFlyoverIndex = tracks.findIndex((track) => track.id === selectedTrack.id);
   menuFlyoverTimer = 7;
-  sceneBuild = buildRaceScene(scene, menuPreviewTrack, buildRacers(), createSceneCar);
+  sceneBuild = buildRaceScene(scene, menuPreviewTrack, buildRacers(), createSceneCar, sceneDetailLevel());
   clearTrackMap();
   race = null;
   latestSnapshot = null;
@@ -573,7 +585,7 @@ function updateMenuCamera(dt: number, cycleTracks: boolean): void {
     if (menuFlyoverTimer <= 0) {
       menuFlyoverIndex = (menuFlyoverIndex + 1) % tracks.length;
       menuPreviewTrack = tracks[menuFlyoverIndex];
-      sceneBuild = buildRaceScene(scene, menuPreviewTrack, buildRacers(), createSceneCar);
+      sceneBuild = buildRaceScene(scene, menuPreviewTrack, buildRacers(), createSceneCar, sceneDetailLevel());
       menuFlyoverTimer = 7;
       showCaption('Arthur Bell', `Track preview: ${menuPreviewTrack.name}.`);
     }
@@ -767,7 +779,29 @@ function rotateCaption(): void {
   showCaption(line[0], fill(line[1]));
 }
 
-function showCaption(name: string, text: string): void {
+function queueDialogue(lines: Array<readonly string[]>, duration = 3.4): void {
+  clearCaptionQueue(true);
+  captionQueue = lines.map(([speaker, text]) => ({ speaker: speaker ?? 'Arthur Bell', text: fill(text ?? ''), duration }));
+  showNextQueuedCaption();
+}
+
+function showNextQueuedCaption(): boolean {
+  const next = captionQueue.shift();
+  if (!next) return false;
+  captionQueueDelivered += 1;
+  showCaption(next.speaker, next.text, next.duration);
+  return true;
+}
+
+function clearCaptionQueue(resetMetrics: boolean): void {
+  captionQueue = [];
+  if (resetMetrics) {
+    captionQueueDelivered = 0;
+    captionQueueSpeakers = [];
+  }
+}
+
+function showCaption(name: string, text: string, duration = 5.5): void {
   caption.textContent = '';
   const speaker = document.createElement('strong');
   speaker.textContent = name;
@@ -775,7 +809,8 @@ function showCaption(name: string, text: string): void {
   caption.classList.add('active');
   lastCaptionSpeaker = name;
   lastCaptionText = text;
-  captionTimer = 5.5;
+  if (!captionQueueSpeakers.includes(name)) captionQueueSpeakers.push(name);
+  captionTimer = duration;
   audio.speak(name, text);
 }
 
@@ -852,7 +887,7 @@ function showCampaignFinale(): void {
 
 function forcePodiumForSmoke(finaleMode = false): void {
   const racers = buildRacers();
-  if (!sceneBuild) sceneBuild = buildRaceScene(scene, selectedTrack, racers, createSceneCar);
+  if (!sceneBuild) sceneBuild = buildRaceScene(scene, selectedTrack, racers, createSceneCar, sceneDetailLevel());
   results = racers.slice(0, 3).map((racer, index) => ({
     racerId: racer.id,
     name: racer.name,
@@ -1021,7 +1056,7 @@ function showReplayScreen(): void {
   root.querySelector<HTMLParagraphElement>('#replayText')!.textContent = lastReplay
     ? `${lastReplay.trackName} replay: ${lastReplay.frames.length} frames, ${lastReplay.events.length} announcer calls, about ${Math.ceil(lastReplay.estimatedBytes / 1024)} KB.`
     : 'No full replay saved yet. Run a race to create the highlight camera.';
-  showCaption('Arthur Bell', fill(dialogue.replay[0][1]));
+  queueDialogue(dialogue.replay, 3.6);
   if (lastReplay) startReplayPlayback();
 }
 
@@ -1032,7 +1067,7 @@ function startReplayPlayback(): void {
   }
   const track = tracks.find((item) => item.id === lastReplay?.trackId) ?? selectedTrack;
   selectedTrack = track;
-  sceneBuild = buildRaceScene(scene, track, buildRacers(), createSceneCar);
+  sceneBuild = buildRaceScene(scene, track, buildRacers(), createSceneCar, sceneDetailLevel());
   replayElapsed = 0;
   replayWrappedElapsed = 0;
   replayEventIndex = 0;
@@ -1042,7 +1077,7 @@ function startReplayPlayback(): void {
   showScreen(null);
   hud.classList.remove('active');
   controls.classList.remove('active');
-  showCaption('Arthur Bell', fill(dialogue.replay[0][1]));
+  queueDialogue(dialogue.replay, 3.6);
 }
 
 function updateReplayPlayback(dt: number): void {
@@ -1120,7 +1155,7 @@ function syncSettingsFromUi(): void {
   settings.realisticTires = root.querySelector<HTMLInputElement>('#realisticTires')!.checked;
   settings.realisticDamage = root.querySelector<HTMLInputElement>('#realisticDamage')!.checked;
   settings.leaderboard = root.querySelector<HTMLInputElement>('#leaderboardToggle')!.checked;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, settings.performanceMode === 'highDetail' ? 2 : 1.45));
+  renderer.setPixelRatio(targetPixelRatio());
   saveSettings();
 }
 
@@ -1143,7 +1178,21 @@ function showScreen(screen: GameState | 'settings' | null): void {
 function resize(): void {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
+  renderer.setPixelRatio(targetPixelRatio());
   renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function sceneDetailLevel(): SceneDetailLevel {
+  if (settings.performanceMode === 'highDetail') return 'full';
+  if (settings.performanceMode === 'battery') return 'battery';
+  return 'balanced';
+}
+
+function targetPixelRatio(): number {
+  const mobile = window.innerWidth <= 640;
+  if (settings.performanceMode === 'highDetail') return Math.min(window.devicePixelRatio, mobile ? 1.2 : 2);
+  if (settings.performanceMode === 'battery') return Math.min(window.devicePixelRatio, mobile ? 0.85 : 1.1);
+  return Math.min(window.devicePixelRatio, mobile ? 1 : 1.3);
 }
 
 function exposeDebug(): void {
@@ -1183,6 +1232,11 @@ function exposeDebug(): void {
       speaker: lastCaptionSpeaker,
       text: lastCaptionText,
       active: caption.classList.contains('active'),
+    },
+    captionSequence: {
+      pending: captionQueue.length,
+      delivered: captionQueueDelivered,
+      speakers: captionQueueSpeakers,
     },
     raceReadability: {
       trackMapActive: Boolean(trackMapLayout),
@@ -1240,7 +1294,7 @@ function exposeDebug(): void {
     assetStatus: formulaAssets.metrics(),
   };
   debug.textContent = `calls ${metrics.calls}\ntris ${metrics.triangles}\ngeos ${metrics.geometries}\ntex ${metrics.textures}\nfps ${metrics.estimatedFps}\nreplay ${metrics.replayFrames}`;
-  debug.classList.toggle('active', settings.performanceMode === 'highDetail');
+  debug.classList.toggle('active', debugOverlayEnabled());
   (window as any).__GRIDLINE_APEX__ = {
     ready: true,
     state: gameState,
@@ -1257,6 +1311,10 @@ function exposeDebug(): void {
       forceAnnouncementConflict: forceAnnouncementConflictForSmoke,
     },
   };
+}
+
+function debugOverlayEnabled(): boolean {
+  return new URLSearchParams(window.location.search).has('debug') || localStorage.getItem('gridline.debug') === 'true';
 }
 
 function summarizeSceneDriverRigs(): {

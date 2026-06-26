@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.11.0 - 2026-06-26
+
+- Added a reusable caption queue so Arthur and Mags can trade tutorial, pre-race, and replay lines instead of only showing the first line.
+- Extended pre-race lead-in timing so both announcers speak before lights-out, with start beeps tied to visible light activation.
+- Kept mobile browser smoke on balanced performance while desktop still verifies high-detail generated cars.
+- Hid the debug overlay unless explicitly requested with `?debug=1` or `gridline.debug=true`, keeping mobile controls clear.
+
 ## 1.10.0 - 2026-06-26
 
 - Split planned radio-team ElevenLabs lines onto a dedicated `ELEVENLABS_RADIO_VOICE_ID` with contact, damage, and tire call assets.

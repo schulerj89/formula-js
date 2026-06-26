@@ -35,8 +35,15 @@ export interface PodiumCeremonyStats {
 
 const roadWidth = 11;
 type CarFactory = (racer: RacerDefinition) => THREE.Group;
+export type SceneDetailLevel = 'full' | 'balanced' | 'battery';
 
-export function buildRaceScene(scene: THREE.Scene, track: TrackDefinition, racers: RacerDefinition[], carFactory: CarFactory = defaultCarFactory): SceneBuild {
+export function buildRaceScene(
+  scene: THREE.Scene,
+  track: TrackDefinition,
+  racers: RacerDefinition[],
+  carFactory: CarFactory = defaultCarFactory,
+  detailLevel: SceneDetailLevel = 'full',
+): SceneBuild {
   disposeScene(scene);
   scene.clear();
   scene.background = new THREE.Color(track.palette.sky);
@@ -50,11 +57,11 @@ export function buildRaceScene(scene: THREE.Scene, track: TrackDefinition, racer
 
   const path = new TrackPath(track);
   scene.add(createGround(track));
-  scene.add(createTrackRibbon(path));
-  scene.add(createKerbs(path, track));
-  scene.add(createScenery(path, track));
+  scene.add(createTrackRibbon(path, detailLevel));
+  scene.add(createKerbs(path, track, detailLevel));
+  scene.add(createScenery(path, track, detailLevel));
   scene.add(createLandmarks(path, track));
-  const tracksideDetails = createTracksideDetails(path, track);
+  const tracksideDetails = createTracksideDetails(path, track, detailLevel);
   scene.add(tracksideDetails.group);
 
   const cars = new Map<string, THREE.Group>();
@@ -99,8 +106,8 @@ function createGround(track: TrackDefinition): THREE.Mesh {
   return ground;
 }
 
-function createTrackRibbon(path: TrackPath): THREE.Mesh {
-  const segments = 420;
+function createTrackRibbon(path: TrackPath, detailLevel: SceneDetailLevel): THREE.Mesh {
+  const segments = detailLevel === 'full' ? 420 : detailLevel === 'balanced' ? 300 : 220;
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
@@ -135,7 +142,7 @@ function createTrackRibbon(path: TrackPath): THREE.Mesh {
   return new THREE.Mesh(geometry, material);
 }
 
-function createKerbs(path: TrackPath, track: TrackDefinition): THREE.Group {
+function createKerbs(path: TrackPath, track: TrackDefinition, detailLevel: SceneDetailLevel): THREE.Group {
   const group = new THREE.Group();
   const red = new THREE.MeshLambertMaterial({ color: 0xd62828 });
   const white = new THREE.MeshLambertMaterial({ color: 0xf8f9fa });
@@ -145,8 +152,9 @@ function createKerbs(path: TrackPath, track: TrackDefinition): THREE.Group {
   const rotation = new THREE.Quaternion();
   const scale = new THREE.Vector3(1, 1, 1);
 
+  const step = detailLevel === 'full' ? 0.006 : detailLevel === 'balanced' ? 0.008 : 0.011;
   for (const [start, end] of track.kerbZones) {
-    for (let p = start; p < end; p += 0.006) {
+    for (let p = start; p < end; p += step) {
       const pose = path.poseAt(p);
       for (const side of [-1, 1]) {
         const matrix = new THREE.Matrix4();
@@ -172,22 +180,24 @@ function createKerbs(path: TrackPath, track: TrackDefinition): THREE.Group {
   return group;
 }
 
-function createScenery(path: TrackPath, track: TrackDefinition): THREE.Group {
+function createScenery(path: TrackPath, track: TrackDefinition, detailLevel: SceneDetailLevel): THREE.Group {
   const group = new THREE.Group();
+  const treeCount = detailLevel === 'full' ? 260 : detailLevel === 'balanced' ? 150 : 88;
+  const buildingCount = detailLevel === 'full' ? 90 : detailLevel === 'balanced' ? 46 : 24;
   const treeTrunk = new THREE.CylinderGeometry(0.45, 0.58, 4, 10);
   const treeCrown = new THREE.ConeGeometry(2.1, 7.5, 18, 4);
   const trunkMat = new THREE.MeshLambertMaterial({ color: 0x5a3825 });
   const crownMat = new THREE.MeshLambertMaterial({ color: track.scenery === 'alpine' ? 0xd8edf5 : 0x174f34 });
-  const trunks = new THREE.InstancedMesh(treeTrunk, trunkMat, 260);
-  const crowns = new THREE.InstancedMesh(treeCrown, crownMat, 260);
+  const trunks = new THREE.InstancedMesh(treeTrunk, trunkMat, treeCount);
+  const crowns = new THREE.InstancedMesh(treeCrown, crownMat, treeCount);
   const buildingGeo = new THREE.BoxGeometry(7, 18, 7, 1, 3, 1);
   const buildingMat = new THREE.MeshLambertMaterial({ color: track.scenery === 'city' ? 0x6e7f91 : 0xb8c3c7 });
-  const buildings = new THREE.InstancedMesh(buildingGeo, buildingMat, 90);
+  const buildings = new THREE.InstancedMesh(buildingGeo, buildingMat, buildingCount);
   const matrix = new THREE.Matrix4();
   const scale = new THREE.Vector3();
   const quat = new THREE.Quaternion();
 
-  for (let i = 0; i < 260; i += 1) {
+  for (let i = 0; i < treeCount; i += 1) {
     const p = (i * 0.037 + 0.13) % 1;
     const side = i % 2 === 0 ? -1 : 1;
     const offset = 34 + (i % 13) * 3.1;
@@ -199,7 +209,7 @@ function createScenery(path: TrackPath, track: TrackDefinition): THREE.Group {
     crowns.setMatrixAt(i, matrix);
   }
 
-  for (let i = 0; i < 90; i += 1) {
+  for (let i = 0; i < buildingCount; i += 1) {
     const p = (i * 0.071 + 0.04) % 1;
     const side = i % 2 === 0 ? -1 : 1;
     const pose = path.poseAt(p, side * (58 + (i % 7) * 8));
@@ -243,11 +253,11 @@ function createLandmarks(path: TrackPath, track: TrackDefinition): THREE.Group {
   return group;
 }
 
-function createTracksideDetails(path: TrackPath, track: TrackDefinition): { group: THREE.Group; stats: TracksideDetailStats } {
+function createTracksideDetails(path: TrackPath, track: TrackDefinition, detailLevel: SceneDetailLevel): { group: THREE.Group; stats: TracksideDetailStats } {
   const group = new THREE.Group();
   group.name = 'trackside-atmosphere';
 
-  const barrierPanels = 320;
+  const barrierPanels = detailLevel === 'full' ? 320 : detailLevel === 'balanced' ? 208 : 128;
   const barrierGeo = new THREE.BoxGeometry(4.4, 0.62, 0.18, 1, 1, 1);
   const barrierMat = new THREE.MeshLambertMaterial({ color: track.scenery === 'city' ? 0x9ea8b4 : 0xd4d8dc });
   const barriers = new THREE.InstancedMesh(barrierGeo, barrierMat, barrierPanels);
@@ -267,7 +277,7 @@ function createTracksideDetails(path: TrackPath, track: TrackDefinition): { grou
   }
   barriers.instanceMatrix.needsUpdate = true;
 
-  const sponsorBoards = 72;
+  const sponsorBoards = detailLevel === 'full' ? 72 : detailLevel === 'balanced' ? 42 : 24;
   const boardGeo = new THREE.BoxGeometry(6.4, 2.1, 0.22, 1, 1, 1);
   const boardMat = new THREE.MeshLambertMaterial({ color: track.palette.accent });
   const boards = new THREE.InstancedMesh(boardGeo, boardMat, sponsorBoards);
@@ -286,8 +296,9 @@ function createTracksideDetails(path: TrackPath, track: TrackDefinition): { grou
   const tireStackMatrices: THREE.Matrix4[] = [];
   const tireStackGeo = new THREE.CylinderGeometry(0.72, 0.72, 0.75, 18, 1);
   const tireStackMat = new THREE.MeshLambertMaterial({ color: 0x0b0c0e });
+  const tireStep = detailLevel === 'full' ? 0.016 : detailLevel === 'balanced' ? 0.024 : 0.034;
   for (const [start, end] of track.kerbZones) {
-    for (let p = start; p < end; p += 0.016) {
+    for (let p = start; p < end; p += tireStep) {
       for (const side of [-1, 1]) {
         const pose = path.poseAt(p, side * (roadWidth / 2 + 5.6));
         const position = pose.position.clone();
@@ -305,7 +316,7 @@ function createTracksideDetails(path: TrackPath, track: TrackDefinition): { grou
   tireStacks.count = tireStackMatrices.length;
   tireStacks.instanceMatrix.needsUpdate = true;
 
-  const pitWallSegments = 26;
+  const pitWallSegments = detailLevel === 'full' ? 26 : detailLevel === 'balanced' ? 18 : 12;
   const pitWallGeo = new THREE.BoxGeometry(2.4, 0.7, 0.34, 1, 1, 1);
   const pitWallMat = new THREE.MeshLambertMaterial({ color: 0xf3f5f8 });
   const pitWall = new THREE.InstancedMesh(pitWallGeo, pitWallMat, pitWallSegments);

@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test';
 test.setTimeout(75_000);
 
 test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
+  const viewport = page.viewportSize();
+  const isMobile = Boolean(viewport && viewport.width <= 640);
   await page.goto('/');
   await page.waitForFunction(() => Boolean((window as any).__GRIDLINE_APEX__?.ready));
   await expect(page.getByRole('heading', { name: 'Gridline Apex' })).toBeVisible();
@@ -20,13 +22,16 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
 
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.assetStatus?.generatedReady, null, { timeout: 20_000 });
   await page.getByRole('button', { name: 'Settings' }).click();
-  await page.locator('#performanceMode').selectOption('highDetail');
+  await page.locator('#performanceMode').selectOption(isMobile ? 'balanced' : 'highDetail');
   await page.getByRole('button', { name: 'Done' }).click();
 
   await page.getByRole('button', { name: 'Time Attack' }).click();
   await page.getByRole('button', { name: 'Race' }).click();
   await expect(page.locator('#startLights')).toBeVisible();
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.lightsOn >= 3);
+  const preraceMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
+  expect(preraceMetrics.captionSequence.delivered).toBeGreaterThanOrEqual(2);
+  expect(preraceMetrics.captionSequence.speakers.sort()).toEqual(['Arthur Bell', 'Mags Whitlow']);
   await page.screenshot({ path: testInfo.outputPath('start-lights.png'), fullPage: true });
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'race');
   await expect(page.locator('#startLights')).toBeHidden();
@@ -43,12 +48,12 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   await page.waitForFunction(() => ((window as any).__GRIDLINE_APEX__?.metrics?.contact?.playerEvents ?? 0) > 0);
   await expect(page.locator('#lap')).toHaveText('1/1');
   await expect(page.locator('#raceHint')).toBeVisible();
-  const viewport = page.viewportSize();
-  if (viewport && viewport.width <= 640) {
+  if (isMobile) {
     await expect(page.locator('#leaderboard')).toBeHidden();
   } else {
     await expect(page.locator('#leaderboard')).toBeVisible();
   }
+  await expect(page.locator('#debug')).toBeHidden();
   await page.screenshot({ path: testInfo.outputPath('race-start.png'), fullPage: true });
 
   const metrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
@@ -61,6 +66,7 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.geometries).toBeLessThan(220);
   expect(metrics.textures).toBeLessThan(20);
   expect(metrics.estimatedFps).toBeGreaterThan(0);
+  if (isMobile) expect(metrics.estimatedFps).toBeGreaterThanOrEqual(30);
   expect(metrics.p95FrameMs).toBeGreaterThan(0);
   expect(metrics.audio.musicCue).toBe('Silent');
   expect(metrics.audio.race.gear).toBeGreaterThanOrEqual(1);
@@ -97,29 +103,46 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.raceCommentary.lastPriority).toBe(4);
   expect(metrics.raceCommentary.lastSpeaker).toBe('Radio');
   expect(metrics.raceCommentary.lastFocusRacerId).toBeTruthy();
-  expect(metrics.sceneDetails.barrierPanels).toBe(320);
-  expect(metrics.sceneDetails.sponsorBoards).toBe(72);
-  expect(metrics.sceneDetails.tireStacks).toBeGreaterThan(40);
-  expect(metrics.sceneDetails.pitWallSegments).toBe(26);
+  if (isMobile) {
+    expect(metrics.sceneDetails.barrierPanels).toBe(208);
+    expect(metrics.sceneDetails.sponsorBoards).toBe(42);
+    expect(metrics.sceneDetails.tireStacks).toBeGreaterThan(24);
+    expect(metrics.sceneDetails.pitWallSegments).toBe(18);
+  } else {
+    expect(metrics.sceneDetails.barrierPanels).toBe(320);
+    expect(metrics.sceneDetails.sponsorBoards).toBe(72);
+    expect(metrics.sceneDetails.tireStacks).toBeGreaterThan(40);
+    expect(metrics.sceneDetails.pitWallSegments).toBe(26);
+  }
   expect(metrics.sceneDetails.startGridMarks).toBe(16);
   expect(metrics.sceneDetails.gantryLights).toBe(5);
   expect(metrics.sceneDetails.instancedBatches).toBe(5);
-  expect(metrics.sceneDetails.totalInstances).toBeGreaterThan(470);
+  expect(metrics.sceneDetails.totalInstances).toBeGreaterThan(isMobile ? 300 : 470);
   expect(metrics.assetKit.referenceImages.chassis).toContain('formula-chassis-reference.png');
   expect(metrics.assetStatus.generatedReady).toBe(true);
-  expect(metrics.assetStatus.runtimeMode).toBe('mixed');
-  expect(metrics.assetStatus.generatedCarsCreated).toBeGreaterThan(0);
-  expect(metrics.assetStatus.proceduralCarsCreated).toBeGreaterThan(0);
   expect(metrics.assetStatus.loadedAssetIds.sort()).toEqual(['chassis', 'driver', 'wheel']);
   expect(metrics.driverRig.activeCars).toBe(8);
   expect(metrics.driverRig.visibleCars).toBe(8);
   expect(metrics.driverRig.carMeshCount).toBeGreaterThan(40);
   expect(metrics.driverRig.customizableDrivers).toBe(8);
-  expect(metrics.driverRig.torsos).toBe(7);
   expect(metrics.driverRig.helmets).toBe(8);
   expect(metrics.driverRig.visors).toBe(8);
   expect(metrics.driverRig.armPairs).toBe(8);
-  expect(metrics.driverRig.generatedSuits).toBeGreaterThan(0);
+  if (isMobile) {
+    expect(metrics.performanceMode).toBe('balanced');
+    expect(metrics.assetStatus.runtimeMode).toBe('procedural');
+    expect(metrics.assetStatus.generatedCarsCreated).toBe(0);
+    expect(metrics.assetStatus.proceduralCarsCreated).toBeGreaterThanOrEqual(8);
+    expect(metrics.driverRig.torsos).toBe(8);
+    expect(metrics.driverRig.generatedSuits).toBe(0);
+  } else {
+    expect(metrics.performanceMode).toBe('highDetail');
+    expect(metrics.assetStatus.runtimeMode).toBe('mixed');
+    expect(metrics.assetStatus.generatedCarsCreated).toBeGreaterThan(0);
+    expect(metrics.assetStatus.proceduralCarsCreated).toBeGreaterThan(0);
+    expect(metrics.driverRig.torsos).toBe(7);
+    expect(metrics.driverRig.generatedSuits).toBeGreaterThan(0);
+  }
   const settings = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.settings);
   expect(settings.bodyPaint).toBe('azure');
   expect(settings.helmetPaint).toBe('gold');

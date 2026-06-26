@@ -4,6 +4,7 @@ import { tracks } from '../src/data/tracks';
 import { musicThemes } from '../src/data/audio';
 import { formulaAssetManifest } from '../src/data/assets';
 import { bodyPaintOptions, helmetPaintOptions } from '../src/data/customization';
+import { dialogue } from '../src/data/dialogue';
 import { elevenLabsSongAssets, elevenLabsVoiceAssets, matchVoiceAsset } from '../src/data/elevenlabs';
 import { analyzeRaceAudio, RaceAudio } from '../src/game/audio';
 import { analyzeCarContact, analyzeCpuRacecraft, createRace, type RacerState } from '../src/game/race';
@@ -93,6 +94,12 @@ describe('track data', () => {
 });
 
 describe('audio data', () => {
+  it('keeps tutorial, pre-race, replay, podium, and finale dialogue as two-announcer exchanges', () => {
+    for (const bank of [dialogue.tutorial, dialogue.prerace, dialogue.replay, dialogue.podium, dialogue.finale]) {
+      expect(new Set(bank.map(([speaker]) => speaker))).toEqual(new Set(['Arthur Bell', 'Mags Whitlow']));
+    }
+  });
+
   it('defines four non-race music themes with distinct titles and tempos', () => {
     expect(Object.keys(musicThemes).sort()).toEqual(['finale', 'menu', 'podium', 'prerace']);
     const titles = new Set(Object.values(musicThemes).map((theme) => theme.title));
