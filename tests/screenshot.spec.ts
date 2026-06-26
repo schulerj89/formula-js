@@ -187,6 +187,7 @@ test('captures title and gameplay artifacts', async ({ page }, testInfo) => {
   expect(metrics.performanceWork.generatedAssetWarmup.scheduled).toBe(true);
   expect(metrics.performanceWork.generatedAssetWarmup.started).toBe(true);
   expect(metrics.performanceWork.generatedAssetWarmup.completed).toBe(true);
+  expect(metrics.performanceWork.generatedAssetWarmup.pending).toBe(false);
   expect(['idle', 'timeout']).toContain(metrics.performanceWork.generatedAssetWarmup.method);
   expect(metrics.performanceWork.generatedAssetWarmup.delayMs).toBeGreaterThanOrEqual(0);
   expect(metrics.assetStatus.loadedAssetIds.sort()).toEqual(['chassis', 'driver', 'wheel']);

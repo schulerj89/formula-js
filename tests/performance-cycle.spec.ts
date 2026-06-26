@@ -31,9 +31,12 @@ test('keeps renderer and replay budgets stable across repeat race scene rebuilds
     expect(sample.viewport.width).toBeLessThanOrEqual(640);
     expect(sample.assetStatus.failedAssetIds).toHaveLength(0);
     expect(sample.assetStatus.loaderDeferred).toBe(true);
-    expect(sample.assetStatus.warmupStarted).toBe(true);
     expect(sample.performanceWork.generatedAssetWarmup.scheduled).toBe(true);
-    expect(sample.performanceWork.generatedAssetWarmup.started).toBe(true);
+    expect(sample.performanceWork.generatedAssetWarmup.started || sample.performanceWork.generatedAssetWarmup.pending).toBe(true);
+    if (sample.performanceWork.generatedAssetWarmup.pending) {
+      expect(['prerace', 'race']).toContain(sample.performanceWork.generatedAssetWarmup.blockedState);
+      expect(sample.assetStatus.warmupStarted).toBe(false);
+    }
     expect(sample.sceneLifecycle.hasScene).toBe(true);
     expect(sample.sceneLifecycle.cars).toBe(8);
     expect(sample.sceneDetails.brakeBoardPanels).toBe(12);
@@ -67,6 +70,50 @@ test('keeps renderer and replay budgets stable across repeat race scene rebuilds
   if (first.heapBytes !== null && second.heapBytes !== null) {
     expect(second.heapBytes - first.heapBytes).toBeLessThan(15 * 1024 * 1024);
   }
+});
+
+test('keeps optional generated asset warmup out of fast-start race phases', async ({ page }) => {
+  const viewport = page.viewportSize();
+  test.skip(Boolean(viewport && viewport.width > 640), 'Fast-start warmup scheduling smoke runs on mobile only.');
+  await page.addInitScript(() => {
+    const testWindow = window as any;
+    testWindow.__GRIDLINE_IDLE_CALLBACKS__ = [];
+    testWindow.requestIdleCallback = (callback: () => void) => {
+      const callbacks = testWindow.__GRIDLINE_IDLE_CALLBACKS__ as Array<() => void>;
+      callbacks.push(callback);
+      return callbacks.length;
+    };
+  });
+
+  await page.goto('/');
+  await page.waitForFunction(() => Boolean((window as any).__GRIDLINE_APEX__?.ready));
+  await page.getByRole('button', { name: 'Time Attack' }).click();
+  await page.getByRole('button', { name: 'Race' }).click();
+  await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'prerace');
+  await page.evaluate(() => {
+    const callbacks = ((window as any).__GRIDLINE_IDLE_CALLBACKS__ ?? []) as Array<() => void>;
+    callbacks.splice(0).forEach((callback) => callback());
+  });
+
+  const preraceMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
+  expect(preraceMetrics.assetStatus.warmupStarted).toBe(false);
+  expect(preraceMetrics.performanceWork.generatedAssetWarmup.scheduled).toBe(true);
+  expect(preraceMetrics.performanceWork.generatedAssetWarmup.started).toBe(false);
+  expect(preraceMetrics.performanceWork.generatedAssetWarmup.pending).toBe(true);
+  expect(preraceMetrics.performanceWork.generatedAssetWarmup.blockedState).toBe('prerace');
+  expect(preraceMetrics.performanceWork.generatedAssetWarmup.deferrals).toBeGreaterThanOrEqual(1);
+
+  await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'race');
+  await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.debug?.forceRaceFinish?.());
+  await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'podium');
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.assetStatus?.generatedReady, null, { timeout: 20_000 });
+
+  const menuMetrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
+  expect(menuMetrics.performanceWork.generatedAssetWarmup.pending).toBe(false);
+  expect(menuMetrics.performanceWork.generatedAssetWarmup.started).toBe(true);
+  expect(menuMetrics.performanceWork.generatedAssetWarmup.completed).toBe(true);
+  expect(menuMetrics.assetStatus.warmupCompleted).toBe(true);
 });
 
 async function runMeasuredRace(page: Page) {

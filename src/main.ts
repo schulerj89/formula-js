@@ -119,7 +119,10 @@ let firstFrameRendered = false;
 let generatedAssetWarmupScheduled = false;
 let generatedAssetWarmupStarted = false;
 let generatedAssetWarmupCompleted = false;
+let generatedAssetWarmupPending = false;
 let generatedAssetWarmupMethod: 'idle' | 'timeout' | null = null;
+let generatedAssetWarmupBlockedState: GameState | null = null;
+let generatedAssetWarmupDeferrals = 0;
 let generatedAssetWarmupScheduledAt = 0;
 let generatedAssetWarmupStartedAt = 0;
 const frameTimes: number[] = [];
@@ -640,6 +643,7 @@ function loadMenuScene(): void {
   latestSnapshot = null;
   hud.classList.remove('active');
   controls.classList.remove('active');
+  retryGeneratedAssetWarmupIfPending();
 }
 
 function scheduleGeneratedAssetWarmup(): void {
@@ -659,6 +663,16 @@ function scheduleGeneratedAssetWarmup(): void {
 
 function startGeneratedAssetWarmup(method: 'idle' | 'timeout'): void {
   if (generatedAssetWarmupStarted) return;
+  if (!canStartGeneratedAssetWarmup()) {
+    generatedAssetWarmupPending = true;
+    generatedAssetWarmupMethod = method;
+    generatedAssetWarmupBlockedState = gameState;
+    generatedAssetWarmupDeferrals += 1;
+    invalidateDebugMetrics();
+    return;
+  }
+  generatedAssetWarmupPending = false;
+  generatedAssetWarmupBlockedState = null;
   generatedAssetWarmupStarted = true;
   generatedAssetWarmupMethod = method;
   generatedAssetWarmupStartedAt = performance.now();
@@ -668,6 +682,15 @@ function startGeneratedAssetWarmup(method: 'idle' | 'timeout'): void {
     invalidateDebugMetrics();
     if (gameState === 'menu' || gameState === 'setup') loadMenuScene();
   });
+}
+
+function retryGeneratedAssetWarmupIfPending(): void {
+  if (!generatedAssetWarmupPending || generatedAssetWarmupStarted || !canStartGeneratedAssetWarmup()) return;
+  startGeneratedAssetWarmup(generatedAssetWarmupMethod ?? 'timeout');
+}
+
+function canStartGeneratedAssetWarmup(): boolean {
+  return gameState === 'menu' || gameState === 'setup';
 }
 
 function updateMenuCamera(dt: number, cycleTracks: boolean): void {
@@ -1467,7 +1490,10 @@ function buildDebugMetrics() {
         scheduled: generatedAssetWarmupScheduled,
         started: generatedAssetWarmupStarted,
         completed: generatedAssetWarmupCompleted,
+        pending: generatedAssetWarmupPending,
         method: generatedAssetWarmupMethod,
+        blockedState: generatedAssetWarmupBlockedState,
+        deferrals: generatedAssetWarmupDeferrals,
         delayMs:
           generatedAssetWarmupScheduled && generatedAssetWarmupStarted
             ? Math.max(0, Math.round(generatedAssetWarmupStartedAt - generatedAssetWarmupScheduledAt))

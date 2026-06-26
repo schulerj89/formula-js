@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.27.0 - 2026-06-26
+
+- Gated optional generated formula-kit warmup so it will not start during pre-race, active race, replay, podium, or finale phases.
+- Added warmup pending, blocked-state, and deferral debug metrics.
+- Added a browser smoke that forces a fast-start pre-race warmup callback and verifies generated assets wait until the menu returns.
+
 ## 1.26.0 - 2026-06-26
 
 - Moved generated formula-kit warmup behind the first rendered frame using idle/timeout scheduling.
