@@ -21,6 +21,8 @@ export interface FormulaAssetMetrics {
   generatedReady: boolean;
   loaderDeferred: boolean;
   loaderLoaded: boolean;
+  warmupStarted: boolean;
+  warmupCompleted: boolean;
   generatedCarsCreated: number;
   proceduralCarsCreated: number;
 }
@@ -82,6 +84,8 @@ export class FormulaAssetManager {
       generatedReady: Boolean(this.currentKit()),
       loaderDeferred: true,
       loaderLoaded: this.loaderLoaded,
+      warmupStarted: Boolean(this.warmupPromise),
+      warmupCompleted: this.state === 'ready' || this.state === 'partial' || this.state === 'fallback',
       generatedCarsCreated: this.generatedCarsCreated,
       proceduralCarsCreated: this.proceduralCarsCreated,
     };

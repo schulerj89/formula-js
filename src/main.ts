@@ -115,6 +115,13 @@ let lastTireScale = '';
 let lastLeaderboardHtml = '';
 let leaderboardExpanded = false;
 let sceneBuildCount = 0;
+let firstFrameRendered = false;
+let generatedAssetWarmupScheduled = false;
+let generatedAssetWarmupStarted = false;
+let generatedAssetWarmupCompleted = false;
+let generatedAssetWarmupMethod: 'idle' | 'timeout' | null = null;
+let generatedAssetWarmupScheduledAt = 0;
+let generatedAssetWarmupStartedAt = 0;
 const frameTimes: number[] = [];
 let frameTimeWindow = 0;
 const roadParkingBase = 17;
@@ -301,9 +308,6 @@ const leaderboardButton = root.querySelector<HTMLButtonElement>('#leaderboardBut
 const trackMapDotElements = new Map<string, SVGCircleElement>();
 
 initUi();
-void formulaAssets.warmup().then(() => {
-  if (gameState === 'menu' || gameState === 'setup') loadMenuScene();
-});
 loadMenuScene();
 showCaption('Arthur Bell', fill(dialogue.title[0][1]));
 
@@ -321,6 +325,10 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(0.05, clock.getDelta());
   update(dt);
   renderer.render(scene, camera);
+  if (!firstFrameRendered) {
+    firstFrameRendered = true;
+    scheduleGeneratedAssetWarmup();
+  }
 });
 
 function initUi(): void {
@@ -632,6 +640,34 @@ function loadMenuScene(): void {
   latestSnapshot = null;
   hud.classList.remove('active');
   controls.classList.remove('active');
+}
+
+function scheduleGeneratedAssetWarmup(): void {
+  if (generatedAssetWarmupScheduled) return;
+  generatedAssetWarmupScheduled = true;
+  generatedAssetWarmupScheduledAt = performance.now();
+  invalidateDebugMetrics();
+  const idleWindow = window as Window & {
+    requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number;
+  };
+  if (idleWindow.requestIdleCallback) {
+    idleWindow.requestIdleCallback(() => startGeneratedAssetWarmup('idle'), { timeout: 1800 });
+  } else {
+    window.setTimeout(() => startGeneratedAssetWarmup('timeout'), 900);
+  }
+}
+
+function startGeneratedAssetWarmup(method: 'idle' | 'timeout'): void {
+  if (generatedAssetWarmupStarted) return;
+  generatedAssetWarmupStarted = true;
+  generatedAssetWarmupMethod = method;
+  generatedAssetWarmupStartedAt = performance.now();
+  invalidateDebugMetrics();
+  void formulaAssets.warmup().then(() => {
+    generatedAssetWarmupCompleted = true;
+    invalidateDebugMetrics();
+    if (gameState === 'menu' || gameState === 'setup') loadMenuScene();
+  });
 }
 
 function updateMenuCamera(dt: number, cycleTracks: boolean): void {
@@ -1427,6 +1463,16 @@ function buildDebugMetrics() {
       trackMapDomWrites,
       debugMetricRefreshes,
       debugMetricCadenceMs: 200,
+      generatedAssetWarmup: {
+        scheduled: generatedAssetWarmupScheduled,
+        started: generatedAssetWarmupStarted,
+        completed: generatedAssetWarmupCompleted,
+        method: generatedAssetWarmupMethod,
+        delayMs:
+          generatedAssetWarmupScheduled && generatedAssetWarmupStarted
+            ? Math.max(0, Math.round(generatedAssetWarmupStartedAt - generatedAssetWarmupScheduledAt))
+            : null,
+      },
     },
     state: gameState,
     menu: {

@@ -30,6 +30,10 @@ test('keeps renderer and replay budgets stable across repeat race scene rebuilds
     expect(sample.performanceMode).toBe('balanced');
     expect(sample.viewport.width).toBeLessThanOrEqual(640);
     expect(sample.assetStatus.failedAssetIds).toHaveLength(0);
+    expect(sample.assetStatus.loaderDeferred).toBe(true);
+    expect(sample.assetStatus.warmupStarted).toBe(true);
+    expect(sample.performanceWork.generatedAssetWarmup.scheduled).toBe(true);
+    expect(sample.performanceWork.generatedAssetWarmup.started).toBe(true);
     expect(sample.sceneLifecycle.hasScene).toBe(true);
     expect(sample.sceneLifecycle.cars).toBe(8);
     expect(sample.sceneDetails.brakeBoardPanels).toBe(12);

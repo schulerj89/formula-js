@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.26.0 - 2026-06-26
+
+- Moved generated formula-kit warmup behind the first rendered frame using idle/timeout scheduling.
+- Added debug metrics for generated asset warmup scheduling, start method, completion, and delay.
+- Expanded unit and browser coverage for cold fallback startup and deferred warmup behavior.
+
 ## 1.25.0 - 2026-06-26
 
 - Deferred `GLTFLoader` behind the generated formula-kit warmup path so procedural gameplay starts without parsing optional GLB tooling.

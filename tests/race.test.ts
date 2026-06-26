@@ -435,6 +435,8 @@ describe('customization and asset pipeline data', () => {
     const initial = manager.metrics();
     expect(initial.loaderDeferred).toBe(true);
     expect(initial.loaderLoaded).toBe(false);
+    expect(initial.warmupStarted).toBe(false);
+    expect(initial.warmupCompleted).toBe(false);
     expect(initial.fallbackReady).toBe(true);
     expect(initial.generatedReady).toBe(false);
 
@@ -445,6 +447,8 @@ describe('customization and asset pipeline data', () => {
     expect(metrics.proceduralCarsCreated).toBe(1);
     expect(metrics.generatedCarsCreated).toBe(0);
     expect(metrics.loaderLoaded).toBe(false);
+    expect(metrics.warmupStarted).toBe(false);
+    expect(metrics.warmupCompleted).toBe(false);
   });
 });
 
