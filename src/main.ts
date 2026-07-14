@@ -479,16 +479,7 @@ function initUi(): void {
   }, () => {
     control.brake = false;
   });
-  bindHold('[data-control="left"]', () => {
-    control.steer = -1;
-  }, () => {
-    if (control.steer < 0) control.steer = 0;
-  });
-  bindHold('[data-control="right"]', () => {
-    control.steer = 1;
-  }, () => {
-    if (control.steer > 0) control.steer = 0;
-  });
+  bindSteeringPad();
 }
 
 function update(dt: number): void {
@@ -1457,6 +1448,45 @@ function bindHold(selector: string, onDown: () => void, onUp: () => void): void 
   element.addEventListener('lostpointercapture', onUp);
 }
 
+function bindSteeringPad(): void {
+  const steeringPad = root.querySelector<HTMLElement>('.control-cluster');
+  if (!steeringPad) return;
+
+  const updateSteerFromPointer = (clientX: number) => {
+    const rect = steeringPad.getBoundingClientRect();
+    const center = rect.left + rect.width / 2;
+    const halfWidth = Math.max(1, rect.width / 2);
+    const steer = THREE.MathUtils.clamp((clientX - center) / halfWidth, -1, 1);
+    control.steer = Math.round(steer * 100) / 100;
+    steeringPad.dataset.steer = control.steer < -0.12 ? 'left' : control.steer > 0.12 ? 'right' : 'center';
+    invalidateDebugMetrics();
+  };
+
+  const resetSteer = () => {
+    control.steer = 0;
+    steeringPad.dataset.steer = 'center';
+    invalidateDebugMetrics();
+  };
+
+  steeringPad.dataset.steer = 'center';
+  steeringPad.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    steeringPad.setPointerCapture(event.pointerId);
+    updateSteerFromPointer(event.clientX);
+  });
+  steeringPad.addEventListener('pointermove', (event) => {
+    if (!steeringPad.hasPointerCapture(event.pointerId)) return;
+    event.preventDefault();
+    updateSteerFromPointer(event.clientX);
+  });
+  steeringPad.addEventListener('pointerup', (event) => {
+    event.preventDefault();
+    resetSteer();
+  });
+  steeringPad.addEventListener('pointercancel', resetSteer);
+  steeringPad.addEventListener('lostpointercapture', resetSteer);
+}
+
 function syncSettingsFromUi(): void {
   settings.controlMode = root.querySelector<HTMLSelectElement>('#controlMode')!.value as GameSettings['controlMode'];
   settings.performanceMode = root.querySelector<HTMLSelectElement>('#performanceMode')!.value as GameSettings['performanceMode'];
@@ -1700,6 +1730,8 @@ function buildDebugMetrics() {
       visiblePedals: [...controls.querySelectorAll<HTMLButtonElement>('.pedal')].filter((pedal) => !pedal.hidden).length,
       goLabel: goPedal.textContent,
       goAriaLabel: goPedal.getAttribute('aria-label'),
+      steerValue: control.steer,
+      steerPadState: controls.querySelector<HTMLElement>('.control-cluster')?.dataset.steer ?? null,
     },
     playerTrackSpace: latestSnapshot
       ? {

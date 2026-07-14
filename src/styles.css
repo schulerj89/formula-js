@@ -717,8 +717,8 @@ p {
   position: absolute;
   inset: auto max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   display: none;
-  grid-template-columns: auto auto auto;
-  gap: 10px;
+  grid-template-columns: minmax(148px, 34vw) auto auto;
+  gap: 12px;
   justify-content: space-between;
   align-items: end;
   pointer-events: none;
@@ -729,22 +729,50 @@ p {
 }
 
 .controls[data-mode="holdToGo"] {
-  grid-template-columns: minmax(136px, 1fr) minmax(150px, 1.2fr);
+  grid-template-columns: minmax(148px, 38vw) minmax(150px, 1.2fr);
 }
 
 .controls[data-mode="holdToGo"] .pedal:not([hidden]) {
-  width: min(48vw, calc(100vw - 176px), 190px);
+  width: min(48vw, calc(100vw - 188px), 210px);
 }
 
 .control-cluster {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
+  min-height: 74px;
+  padding: 5px;
+  border: 1px solid rgb(223 247 255 / 18%);
+  border-radius: 999px;
+  background: rgb(8 14 21 / 48%);
   pointer-events: auto;
+  touch-action: none;
+}
+
+.control-cluster::after {
+  content: "slide";
+  position: absolute;
+  left: 50%;
+  bottom: 7px;
+  transform: translateX(-50%);
+  color: rgb(223 247 255 / 62%);
+  font-size: 0.54rem;
+  font-weight: 900;
+  letter-spacing: 0px;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.control-cluster[data-steer="left"] .steer[data-control="left"],
+.control-cluster[data-steer="right"] .steer[data-control="right"] {
+  background: #dff7ff;
+  color: #071018;
 }
 
 .pedal {
-  width: max(64px, min(30vw, calc((100vw - 182px) / 2), 150px));
-  height: 74px;
+  width: max(64px, min(28vw, calc((100vw - 202px) / 2), 150px));
+  height: 78px;
   border: 0;
   border-radius: 8px;
   color: #071018;
@@ -763,7 +791,8 @@ p {
 }
 
 .steer {
-  width: 64px;
+  width: 100%;
+  min-width: 58px;
   height: 64px;
   border: 0;
   border-radius: 50%;
