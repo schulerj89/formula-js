@@ -114,6 +114,8 @@ async function readControlLayout(page: Page) {
         text: go.textContent,
         aria: go.getAttribute('aria-label'),
         color: getComputedStyle(go).backgroundColor,
+        pointerEvents: getComputedStyle(go).pointerEvents,
+        userSelect: getComputedStyle(go).userSelect,
         box: box(go),
       },
       brake: {

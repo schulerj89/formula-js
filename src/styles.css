@@ -722,6 +722,15 @@ p {
   justify-content: space-between;
   align-items: end;
   pointer-events: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+}
+
+.controls button {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .controls.active {
@@ -779,6 +788,7 @@ p {
   background: #45d483;
   font-weight: 900;
   text-transform: uppercase;
+  pointer-events: auto;
   touch-action: none;
 }
 
