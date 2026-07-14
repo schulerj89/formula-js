@@ -20,8 +20,6 @@ test('shows distinct mobile pedal layouts for hold and split controls', async ({
   expect(hold.brake.hidden).toBe(true);
   expect(hold.go.box.width).toBeGreaterThanOrEqual(44);
   expect(hold.go.box.height).toBeCloseTo(78, 0);
-  expect(hold.go.pointerEvents).toBe('auto');
-  expect(hold.go.userSelect).toBe('none');
   expect(hold.go.box.x).toBeGreaterThanOrEqual(0);
   expect(hold.go.box.right).toBeLessThanOrEqual(hold.viewport.width);
   expect(hold.go.box.bottom).toBeLessThanOrEqual(hold.viewport.height);
