@@ -19,7 +19,7 @@ test('shows distinct mobile pedal layouts for hold and split controls', async ({
   expect(hold.go.aria).toBe('Hold go, release to brake');
   expect(hold.brake.hidden).toBe(true);
   expect(hold.go.box.width).toBeGreaterThanOrEqual(44);
-  expect(hold.go.box.height).toBeCloseTo(74, 0);
+  expect(hold.go.box.height).toBeCloseTo(78, 0);
   expect(hold.go.box.x).toBeGreaterThanOrEqual(0);
   expect(hold.go.box.right).toBeLessThanOrEqual(hold.viewport.width);
   expect(hold.go.box.bottom).toBeLessThanOrEqual(hold.viewport.height);
@@ -29,6 +29,14 @@ test('shows distinct mobile pedal layouts for hold and split controls', async ({
   expect(metrics.controlLayout.visiblePedals).toBe(1);
   expect(metrics.controlLayout.goLabel).toBe('Hold Go');
   expect(metrics.controlLayout.goAriaLabel).toBe('Hold go, release to brake');
+  await dragSteering(page, hold.cluster.box, 'right');
+  metrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
+  expect(metrics.controlLayout.steerValue).toBeGreaterThan(0.6);
+  expect(metrics.controlLayout.steerPadState).toBe('right');
+  await page.mouse.up();
+  await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.metrics?.controlLayout?.steerValue === 0);
+  metrics = await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.metrics);
+  expect(metrics.controlLayout.steerPadState).toBe('center');
 
   await page.evaluate(() => (window as any).__GRIDLINE_APEX__?.debug?.forceRaceFinish?.());
   await page.waitForFunction(() => (window as any).__GRIDLINE_APEX__?.state === 'podium');
@@ -49,8 +57,8 @@ test('shows distinct mobile pedal layouts for hold and split controls', async ({
   expect(split.go.color).toBe('rgb(69, 212, 131)');
   expect(split.brake.color).toBe('rgb(255, 107, 107)');
   expect(Math.abs(split.go.box.width - split.brake.box.width)).toBeLessThanOrEqual(1);
-  expect(split.go.box.height).toBeCloseTo(74, 0);
-  expect(split.brake.box.height).toBeCloseTo(74, 0);
+  expect(split.go.box.height).toBeCloseTo(78, 0);
+  expect(split.brake.box.height).toBeCloseTo(78, 0);
   expect(split.brake.box.right).toBeLessThan(split.go.box.x);
   expect(split.cluster.box.right).toBeLessThan(split.brake.box.x);
   for (const pedal of [split.brake.box, split.go.box]) {
@@ -116,4 +124,13 @@ async function readControlLayout(page: Page) {
       },
     };
   });
+}
+
+async function dragSteering(page: Page, box: { x: number; y: number; width: number; height: number }, direction: 'left' | 'right') {
+  const y = box.y + box.height / 2;
+  const startX = box.x + box.width / 2;
+  const endX = direction === 'right' ? box.x + box.width - 8 : box.x + 8;
+  await page.mouse.move(startX, y);
+  await page.mouse.down();
+  await page.mouse.move(endX, y, { steps: 4 });
 }
